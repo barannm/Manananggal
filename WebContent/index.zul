@@ -1,0 +1,5 @@
+<zk>
+  <window use="Manananggal.SplicingWebApp">
+  <timer id="timerKeepAliveSession" repeats="true" delay="30000"/>
+  </window>
+</zk>

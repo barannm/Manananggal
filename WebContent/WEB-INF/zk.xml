@@ -1,0 +1,9 @@
+<zk>
+	<session-config>
+		<device-type>ajax</device-type>
+		<automatic-timeout>true</automatic-timeout>
+		<session-timeout>-1</session-timeout>
+		<timeout-uri>/timeout.html</timeout-uri>
+		<timer-keep-alive>true</timer-keep-alive>
+	</session-config>
+</zk>
