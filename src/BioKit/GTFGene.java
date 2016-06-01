@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
+import java.util.TreeMap;
 import java.util.Vector;
 
 /**
@@ -25,6 +26,9 @@ public class GTFGene
 	private String geneName;
 	private String geneType;	// review http://www.gencodegenes.org/gencode_biotypes.html for gene types
 	
+	private TreeMap<String, Integer> mapCDSstartToIsoforms;
+	private TreeMap<String, Integer> mapCDSendToIsoforms;
+	
 	private HashMap<String, Vector<Interval>> exonIntervals;
 	
 	public GTFGene(String chromosome, boolean isPlusStrand, String id, String geneName, String geneType, String type)
@@ -36,7 +40,16 @@ public class GTFGene
 		this.geneName = geneName;
 		this.geneType = geneType;
 		
+		mapCDSstartToIsoforms 	= new TreeMap<String, Integer>();
+		mapCDSendToIsoforms 	= new TreeMap<String, Integer>();
+		
 		exonIntervals = new HashMap<String, Vector<Interval>>();
+	}
+	
+	public void SetCDSPositions(TreeMap<String, Integer> mapCDSstart, TreeMap<String, Integer> mapCDSend)
+	{
+		mapCDSstartToIsoforms = mapCDSstart;
+		mapCDSendToIsoforms	  = mapCDSend;
 	}
 	
 	public void setSynonymInformation(String synonyms)
@@ -165,8 +178,7 @@ public class GTFGene
 			gene.addGeneProduct(t, "", exons);
 		}
 		
-		//System.out.println(gene.toString());
-		
+		gene.SetCDSPositions(mapCDSstartToIsoforms, mapCDSendToIsoforms);
 		return gene;
 	}
 	

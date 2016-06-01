@@ -1,0 +1,281 @@
+<head>
+<link rel="stylesheet" type="text/css" href="./css/manual.css">
+</head>
+
+<body>
+	<div class="title_div">
+	<h1 class="title blood">Manananggal – Userguide</h1>
+
+	<!-- SECTIONS -->
+	<nav class="nav_effect">
+		<ul>
+			<li>
+				<a href="./installation.html">Installation</a>
+				<ul>
+				<li><a href="./installation.html#console_app">Installing the console application</a></li>
+				<li><a href="./installation.html#web_app">Installing the web application</a></li>
+				<li><a href="./installation.html#crossref">Cross-reference file</a></li>
+				<li><a href="./installation.html#counts_tissue_gene">Tissue specific gene expression</a></li>
+				<li><a href="./installation.html#counts_tissue_exon">Tissue specific exon expression</a></li>			
+				</ul>
+			</li>
+			<li>
+				<a href="./new_project.html">Adding projects</a>
+				<ul>
+					<li><a href="./new_project.html#requirements">Requirements</a></li>
+					<li><a href="./new_project.html#bigwig">Generation of BigWig files</a></li>
+					<li><a href="./new_project.html#count_files">Generation of count files</a></li>
+					<li><a href="./new_project.html#project_file">Preparing the project file</a></li>
+					<li><a href="./new_project.html#merging">Merging junction count files</a></li>
+				</ul>
+			</li>
+			<li>
+				<a href="./console_application.html">The console app</a>
+				<ul>
+					<li><a href="./console_application.html#running">Running the Console Application</a></li>
+					<li><a href="./console_application.html#output">Output Format</a></li>						
+				</ul>
+			</li>
+			<li><a href="./viewer.html">The viewer</a>
+				<ul>
+					<li><a href="./viewer.html#Overview">Overview</a></li>
+					<li><a href="./viewer.html#Settings">Settings Menu</a></li>
+					<li><a href="./viewer.html#Options">Option Menu</a></li>
+					<li><a href="./viewer.html#Samples">Sample Selection</a></li>
+					<li><a href="./viewer.html#Colors">Sample Colors</a></li>
+					<li><a href="./viewer.html#Isoforms">Isoform Selection</a></li>
+					<li><a href="./viewer.html#AdvancedOptions">Advanced Options Menu</a></li>
+					<li><a href="./viewer.html#Results">Results Window</a></li>
+					<li><a href="./viewer.html#Coverage">Coverage Plot</a></li>
+					<li><a href="./viewer.html#IsoformPlot">Isoform Plot</a></li>
+				</ul>
+			</li>
+			<li><a href="./interpreting_results.html">Interpreting results</a></li>
+		</ul>
+	</nav>
+	</div>
+
+	<div class="content_div">
+	
+		<a class="anchor" id="requirements">&nbsp;</a>
+		<section class=mysection>			
+			<header><h1>Requirements</h1></header>
+			<div class=mydiv>
+				<p>To add a new project you need the following data:</p>
+				<ol class=my_counter>
+					<li>one bigwig file for each sample</li>
+					<li>one count file for junction spanning reads for each sample</li>
+					<li>a .project file</li>
+				</ol>
+				<p>We will shortly discuss how to generate all these files.</p>				
+			</div>
+		</section>
+		
+		<a class="anchor" id="bigwig">&nbsp;</a>
+		<section class=mysection>			
+			<header><h1>Generation of BigWig files</h1></header>
+			<div class=mydiv>
+				<p>There are multiple ways to generate bigwig files. This usually involves converting a <font style="color: hsl(100,100%,50%)">.bam</font>
+				file to a wiggle track (<font style="color: hsl(100,100%,50%)">.wig</font>) and then converting the wiggle track into a binary bigwig (<font style="color: hsl(100,100%,50%)">.bw</font>).</p>
+				<p>One convenient way to do this is by running the python script <font style="color: hsl(100,100%,50%)">bam2wig.py</font> provided by <a class="text_link" href="http://rseqc.sourceforge.net/">RSeQC</a>. The script will generate wiggle tracks and automatically
+				convert them to bigwig format if the UCSC binary that performs this job (<a class="text_link" href="http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig">wigToBigWig</a>) is found in the
+				<font style="color: hsl(240,100%,80%)">PATH</font> variable.</p>
+			</div>
+		</section>
+		
+		<a class="anchor" id="count_files">&nbsp;</a>
+		<section class=mysection>			
+			<header><h1>Generation of count files</h1></header>
+			<div class=mydiv>
+				<p>Manananggal can generate junction spanning read count files, but you can also generate your own. The following bash command shows how to generate counts using Manananggal.</p>
+				
+				<div class=div_code>
+					<p>java -cp /Manananggal/lib/*:/Manananggal.jar Manananggal.SplicingAnalyzer prepare_counts $reference $fileIn $fileOut -lenient</p>
+				</div>
+				<p>The reference file must be a <font style="color: hsl(100,100%,50%)">GTF</font> file and the input file must be a <font style="color: hsl(100,100%,50%)">.bam</font>.
+				The output file has the following format:</p>
+				<div class=table>
+					<div class="row header">
+						<div class=cell>Type</div>
+						<div class=cell>Gene ID</div>
+						<div class=cell>Forward strand</div>
+						<div class=cell>Position</div>
+						<div class=cell>Reference name</div>
+						<div class=cell>Start</div>
+						<div class=cell>End</div>
+						<div class=cell>Place_holder</div>
+						<div class=cell>Count</div>
+						<div class=cell>Place_holder</div>
+					</div>
+					<div class=row>
+						<div class=cell>Junction</div>
+						<div class=cell>ENSG00000223972</div>
+						<div class=cell>true</div>
+						<div class=cell>12057-12179</div>
+						<div class=cell>chr1</div>
+						<div class=cell>12057</div>
+						<div class=cell>12179</div>
+						<div class=cell>0</div>
+						<div class=cell>5</div>
+						<div class=cell>0</div>
+					</div>
+					<div class=row>
+						<div class=cell>Junction</div>
+						<div class=cell>ENSG00000241860</div>
+						<div class=cell>false</div>
+						<div class=cell>165942-168100</div>
+						<div class=cell>chr1</div>
+						<div class=cell>165942</div>
+						<div class=cell>168100</div>
+						<div class=cell>0</div>
+						<div class=cell>11</div>
+						<div class=cell>0</div>
+					</div>
+					<div class=row>
+						<div class=cell>Junction</div>
+						<div class=cell>ENSG00000223972</div>
+						<div class=cell>true</div>
+						<div class=cell>12057-12179</div>
+						<div class=cell>chr1</div>
+						<div class=cell>12057</div>
+						<div class=cell>12179</div>
+						<div class=cell>0</div>
+						<div class=cell>5</div>
+						<div class=cell>0</div>
+					</div>
+					<div class=row>
+						<div class=cell>Novel_Junction</div>
+						<div class=cell>unknown</div>
+						<div class=cell>unknown</div>
+						<div class=cell>1376721-1389203</div>
+						<div class=cell>chr1</div>
+						<div class=cell>1376721</div>
+						<div class=cell>1389203</div>
+						<div class=cell>0</div>
+						<div class=cell>2</div>
+						<div class=cell>0</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		
+		<a class="anchor" id="project_file">&nbsp;</a>
+		<section class=mysection>
+			<header><h1>Preparing the project file</h1></header>
+			<div class=mydiv>
+				<p>The project file includes defines which bigwig and count files belongs to which sample. Some headers in this file are mandatory, while all other headers are used for sample grouping.
+				Shown below is an example of a project file that groups samples by condition and tissue type.</p>
+				
+				<div class=div_code>
+					<p>java -cp /software/Manananggal/lib/*:/software/Manananggal.jar Manananggal.SplicingAnalyzer <font style="color: hsl(260, 100%, 50%);">prepare_counts</font> reference.gtf in.bam out.tsv -lenient</p>
+				</div>
+				<p>The reference file must be a <font style="color: hsl(100,100%,50%)">GTF</font> file and the input file must be a <font style="color: hsl(100,100%,50%)">.bam</font>.
+				The output file has the following format:</p>
+				<div class=table>
+					<div class="row header">
+						<div class=cell>sample<font style="color: red;"><sup>&#10008;</sup></font></div>
+						<div class=cell>condition</div>
+						<div class=cell>size_factors<font style="color: red;"><sup>&#10008;</sup></font></div>
+						<div class=cell>bigwig_files<font style="color: red;"><sup>&#10008;</sup></font></div>
+						<div class=cell>junction_count_files<font style="color: red;"><sup>&#10008;</sup></font></div>
+						<div class=cell>tissue</div>
+						<div class=cell>individual</div>
+					</div>
+					<div class="row">
+						<div class=cell>Mickey</div>
+						<div class=cell>tumor</div>
+						<div class=cell>1.13</div>
+						<div class=cell>bigwig_1.bw</div>
+						<div class=cell>count_file_1.tsv</div>
+						<div class=cell>liver</div>
+						<div class=cell>patient_1</div>
+					</div>
+					<div class="row">
+						<div class=cell>Donald</div>
+						<div class=cell>tumor</div>
+						<div class=cell>0.91</div>
+						<div class=cell>bigwig_2.bw</div>
+						<div class=cell>count_file_2.tsv</div>
+						<div class=cell>lung</div>
+						<div class=cell>patient_2</div>
+					</div>
+					<div class="row">
+						<div class=cell>Mickey</div>
+						<div class=cell>control</div>
+						<div class=cell>1.20</div>
+						<div class=cell>bigwig_3.bw</div>
+						<div class=cell>count_file_3.tsv</div>
+						<div class=cell>liver</div>
+						<div class=cell>patient_1</div>
+					</div>
+					<div class="row">
+						<div class=cell>Donald</div>
+						<div class=cell>control</div>
+						<div class=cell>0.98</div>
+						<div class=cell>bigwig_4.bw</div>
+						<div class=cell>count_file_4.tsv</div>
+						<div class=cell>lung</div>
+						<div class=cell>patient_2</div>
+					</div>
+				</div>
+				<p>Mandatory headers are marked by <font style="color: red;"><sup>&#10008;</sup></font>. In the above example there are two columns used for sample grouping.
+				The first (condition) specifies which samples are controls and tumor samples and the second ("tissue") separates samples by lung and liver samples.
+				The last column (individual) is also an optional column. If specified and all samples are valid matched samples Manananggal will use paired tests instead of unpaired tests.</p>
+				<p>Size factors can either be entered manually or you can let Manananggal estimate them for you. If you do not have size factors at hand (e.g. from a previous DESeq analysis)
+				you can leave the size_factors column blank and run the following command:</p>
+				<div class=div_code>
+					<p>java -cp /software/Manananggal/lib/*:/software/Manananggal.jar Manananggal.SplicingAnalyzer <font style="color: hsl(260, 100%, 50%);">calculate_size_factors</font> reference.gtf my.project</p>
+				</div>
+				<p>This command will also invoke merging and indexing of junction count files if this hasn't been done already. The section below explains how to manually merge and index the junction count files.</p>
+			</div>
+		</section>
+		
+		<a class="anchor" id="merging">&nbsp;</a>
+		<section class=mysection>
+			<header><h1>Merging junction count files</h1></header>
+			<div class=mydiv>
+				<p>Manananggal uses an indexed binary format of the junction count files. During merging and indexing low coverage junctions can be discarded.
+				To convert the junction counts into the desired format you can call the following function:</p>
+				<div class=div_code>
+					<p>java -cp /software/Manananggal/lib/*:/software/Manananggal.jar Manananggal.SplicingAnalyzer <font style="color: hsl(260, 100%, 50%);">merge</font> my.project</p>
+					<br>
+					<p>or</p>
+					<br>
+					<p>java -cp /software/Manananggal/lib/*:/software/Manananggal.jar Manananggal.SplicingAnalyzer <font style="color: hsl(260, 100%, 50%);">merge</font> my.project minValidSamples minSampleCoverage minAvgCount minCoverageSingleSample</p>
+				</div>
+				
+				<p>The following table explains the optional parameters:</p>
+				<div class=table>
+					<div class="row header">
+						<div class=cell>Parameter</div>
+						<div class=cell>Default Value</div>
+					</div>
+					<div class="row">
+						<div class=cell>minValidSamples</div>
+						<div class=cell><font style="color: hsl(50, 100%, 50%); font-weight: 800; text-shadow: 1px 1px 1px hsl(0, 0%, 0%);">10</font></div>
+					</div>
+					<div class="row">
+						<div class=cell>minSampleCoverage</div>
+						<div class=cell><font style="color: hsl(0, 100%, 60%); font-weight: 800; text-shadow: 1px 1px 1px hsl(0, 0%, 0%);">1</font></div>
+					</div>
+					<div class="row">
+						<div class=cell>minAvgCount</div>
+						<div class=cell><font style="color: hsl(160, 100%, 20%); font-weight: 800; text-shadow: 1px 1px 1px hsl(0, 0%, 0%);">1</font></div>
+					</div>
+					<div class="row">
+						<div class=cell>minCoverageSingleSample</div>
+						<div class=cell><font style="color: hsl(260, 100%, 50%); font-weight: 800; text-shadow: 1px 1px 1px hsl(0, 0%, 0%);">10</font></div>
+					</div>
+				</div>
+				
+				<p>What does this mean? By default valid junctions must fulfill one of the following criteria:</p>
+				<ol class=my_counter>
+					<li><font style="color: hsl(50, 100%, 50%); font-weight: 800;">10</font> samples support the junction with at least <font style="color: hsl(0, 100%, 60%); font-weight: 800;">1</font> read</li>
+					<li>The average count across all samples is at least <font style="color: hsl(160, 100%, 20%); font-weight: 800;">1</font></li>
+					<li>At least one sample has a read count of <font style="color: hsl(260, 100%, 50%); font-weight: 800;">10</font> or above</li>										
+				</ol>
+			</div>
+		</section>
+	</div>
+  
+</body>

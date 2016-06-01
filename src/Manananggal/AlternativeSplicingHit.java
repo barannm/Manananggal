@@ -10,116 +10,6 @@ import BioKit.ExonGroup;
 
 public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit>
 {
-	
-	public class AlternativeSplicingExon implements Comparable<AlternativeSplicingExon>
-	{
-		private String m_strID;
-		private int	   m_nStart;
-		private int	   m_nEnd;
-		private String m_strExonGroup;
-		private String m_strConditionA;
-		private String m_strConditionB;
-		
-		private double m_fAltExonCovPerBaseA;	// expression value of the alternatively spliced exon
-		private double m_fAltExonCovPerBaseB;	// expression value of the alternatively spliced exon
-		
-		private double m_fFractionChangeAbsolute;
-		private double m_fFractionChangeRelative;
-		private double m_fPValue;
-		
-		private double[] m_pFractionTestedExon;
-		private double[] m_pFractionOtherExons;
-		
-		AlternativeSplicingExon()
-		{
-			m_nStart 		= -1;
-			m_nEnd 			= -1;
-			m_strExonGroup	= "?";
-			m_strConditionA	= "?";
-			m_strConditionB = "?";
-			
-			m_fFractionChangeAbsolute = -1.0;
-			m_fFractionChangeRelative = -1.0;
-			m_fPValue				  = -1.0;
-			
-			m_pFractionTestedExon = null;
-			m_pFractionOtherExons = null;
-			
-			m_strID = "?";
-		}
-		
-		AlternativeSplicingExon(String strExonGroup, int nStart, int nEnd, String strConditionA, String strConditionB, double fAltExonCovPerBaseA, double fAltExonCovPerBaseB, double fFractionChangeAbsolute, double fFractionChangeRelative, double fPValue, double[] pFractionTestedExon, double[] pFractionOtherExons)
-		{
-			m_nStart		= nStart;
-			m_nEnd			= nEnd;
-			m_strExonGroup	= strExonGroup;
-			m_strConditionA	= strConditionA;
-			m_strConditionB = strConditionB;
-			
-			m_fFractionChangeAbsolute = fFractionChangeAbsolute;
-			m_fFractionChangeRelative = fFractionChangeRelative;
-			m_fPValue				  = fPValue;
-			
-			m_pFractionTestedExon = pFractionTestedExon;
-			m_pFractionOtherExons = pFractionOtherExons;
-			
-			m_fAltExonCovPerBaseA = fAltExonCovPerBaseA;
-			m_fAltExonCovPerBaseB = fAltExonCovPerBaseB;
-			
-			m_strID = m_strExonGroup + "_" + m_strConditionA + "_" + m_strConditionB;
-		}
-		
-		public int GetStart()
-		{
-			return m_nStart;
-		}
-		
-		public int GetEnd()
-		{
-			return m_nEnd;
-		}
-		
-		public String GetID()
-		{
-			return m_strID;
-		}
-		
-		public String GetCondition(boolean bFirstCondition)
-		{
-			if(bFirstCondition)
-				return m_strConditionA;
-			
-			return m_strConditionB;
-		}
-
-		@Override
-		public int compareTo(AlternativeSplicingExon other)
-		{
-			return(m_strID.compareTo(other.m_strID));
-		}
-		
-		public boolean equals(AlternativeSplicingExon other)
-		{
-			return(m_strID.equals(other.m_strID));
-		}
-		
-		public double GetAbsoluteChange()
-		{
-			return m_fFractionChangeAbsolute;
-		}
-		
-		public double GetRelativeChange()
-		{
-			return m_fFractionChangeRelative;
-		}
-		
-		public double GetPValue()
-		{
-			return m_fPValue;
-		}
-		
-	};
-	
 	private int				m_nRating;
 	private String			m_strRef;
 	private String			m_strGeneID;
@@ -171,9 +61,14 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 		m_vcAlternativeSplicedExons = new TreeSet<AlternativeSplicingExon>();
 	}
 	
-	public void AddASExons(String strExonGroup, int nStart, int nEnd, String strConditionA, String strConditionB, double fAltExonCovPerBaseA, double fAltExonCovPerBaseB, double fFractionChangeAbsolute, double fFractionChangeRelative, double fPValue, double[] pFractionTestedExon, double[] pFractionOtherExons)
+	public void AddASExons(int nType, String strExonGroup, int nStart, int nEnd, String strConditionA, String strConditionB, double fAltExonCovPerBaseA, double fAltExonCovPerBaseB, double fFractionChangeAbsolute, double fFractionChangeRelative, double fPValue, double[] pFractionTestedExon, double[] pFractionOtherExons)
 	{		
-		AlternativeSplicingExon hit = new AlternativeSplicingExon(strExonGroup, nStart, nEnd, strConditionA, strConditionB, fAltExonCovPerBaseA, fAltExonCovPerBaseB, fFractionChangeAbsolute, fFractionChangeRelative, fPValue, pFractionTestedExon, pFractionOtherExons);
+		AlternativeSplicingExon hit = new AlternativeSplicingExon(nType, strExonGroup, nStart, nEnd, strConditionA, strConditionB, fAltExonCovPerBaseA, fAltExonCovPerBaseB, fFractionChangeAbsolute, fFractionChangeRelative, fPValue, pFractionTestedExon, pFractionOtherExons);
+		m_vcAlternativeSplicedExons.add(hit);
+	}
+	
+	public void AddASExon(AlternativeSplicingExon hit)
+	{
 		m_vcAlternativeSplicedExons.add(hit);
 	}
 	
@@ -233,6 +128,8 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 		
 		for(AlternativeSplicingExon hit : m_vcAlternativeSplicedExons)
 		{
+			pFile.writeInt(hit.m_nType);
+			
 			pFile.writeUTF(hit.m_strExonGroup);
 			
 			pFile.writeInt(hit.m_nStart);
@@ -290,6 +187,8 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 			{
 				AlternativeSplicingExon hit = new AlternativeSplicingExon();
 				
+				hit.m_nType			= pFile.readInt();
+				
 				hit.m_strExonGroup	= pFile.readUTF();
 				hit.m_nStart		= pFile.readInt();
 				hit.m_nEnd			= pFile.readInt();
@@ -314,7 +213,7 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 				for(int j=0; j<nFractions; j++)
 					hit.m_pFractionOtherExons[j] = pFile.readDouble();
 				
-				hit.m_strID = hit.m_strExonGroup + "_" + hit.m_strConditionA + "_" + hit.m_strConditionB;
+				hit.m_strID = hit.m_nType + "_" + hit.m_strExonGroup + "_" + hit.m_strConditionA + "_" + hit.m_strConditionB;
 			}
 		}
 		catch(IOException ex)
@@ -467,8 +366,6 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 		
 		for(AlternativeSplicingExon hit : m_vcAlternativeSplicedExons)
 		{
-//			if(hit.m_nStart != nStart || hit.m_nEnd != nEnd)
-//				continue;
 			if(nStart > hit.m_nEnd || nEnd < hit.m_nStart)
 				continue;
 
@@ -486,17 +383,30 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 		{
 			if(!hit.m_strID.equals(strID))
 				continue;
-			
-			strRes += String.format(Locale.ENGLISH, "\t%s\t%s\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.4e", hit.m_strExonGroup, hit.m_strConditionA, hit.m_strConditionB, hit.m_fAltExonCovPerBaseA, hit.m_fAltExonCovPerBaseB, Math.abs(hit.m_fAltExonCovPerBaseA-hit.m_fAltExonCovPerBaseB), hit.m_fFractionChangeAbsolute, hit.m_fFractionChangeRelative, hit.m_fPValue);
+
+			strRes += String.format(Locale.ENGLISH, "\t%s\t%s\t%s\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.4e", hit.GetTypeAsString(), hit.m_strExonGroup, hit.m_strConditionA, hit.m_strConditionB, hit.m_fAltExonCovPerBaseA, hit.m_fAltExonCovPerBaseB, Math.abs(hit.m_fAltExonCovPerBaseA-hit.m_fAltExonCovPerBaseB), hit.m_fFractionChangeAbsolute, hit.m_fFractionChangeRelative, hit.m_fPValue);
 			break;
 		}
 
 		return strRes;
 	}
 	
+	public AlternativeSplicingExon GetExonGroup(String strID)
+	{
+		for(AlternativeSplicingExon hit : m_vcAlternativeSplicedExons)
+		{
+			if(!hit.m_strID.equals(strID))
+				continue;
+			
+			return hit;
+		}
+		
+		return null;
+	}
+	
 	@Override
 	public String toString()
-	{
+	{	
 		String strRes = m_nRating + "\t" + m_strGeneID + "\t" + m_strGeneSymbol + "\t" + m_strFileGTF + "\t" + m_nMinJunctionReads + "\t" + m_nMinCovPerBase + "\t" + m_fMinCoveredBases + "\t" + m_fVariableExonThreshold + "\t" + m_strComment + "\n";
 		strRes += "Isoforms: ";
 		for(String strIsoform : m_vcSelectedIsoforms)
@@ -505,7 +415,23 @@ public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit
 		
 		for(AlternativeSplicingExon hit : m_vcAlternativeSplicedExons)
 		{
-			strRes += String.format(Locale.ENGLISH, "\t%s\t%s\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%.4e\n", hit.m_strExonGroup, hit.m_strConditionA, hit.m_strConditionB, hit.m_fAltExonCovPerBaseA, hit.m_fAltExonCovPerBaseB, hit.m_fFractionChangeAbsolute, hit.m_fFractionChangeRelative, hit.m_fPValue);
+			String strType = "?";
+			switch(hit.m_nType)
+			{
+				case SplicingWebApp.AS_TYPE_EXON_SKIPPING: 			strType = "exn_skipping"; 			break;
+				case SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN: 	strType = "alt_start_unique_jun"; 	break;
+				case SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN: 	strType = "alt_end_unique_jun"; 	break;
+				case SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN: 	strType = "alt_start_shared_jun"; 	break;
+				case SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN: 	strType = "alt_end_shared_jun"; 	break;
+				case SplicingWebApp.AS_TYPE_RETAINED_INTRON:		strType = "retained_intron";		break;
+				case SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE: 	strType = "alt_start_unique_jun_double"; 	break;
+				case SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE: 		strType = "alt_end_unique_jun_double"; 		break;
+				case SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN_DOUBLE: 	strType = "alt_start_shared_jun_double"; 	break;
+				case SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN_DOUBLE: 		strType = "alt_end_shared_jun_double"; 		break;
+				default: strType = "" + hit.m_nType; 			break;
+			}
+			
+			strRes += String.format(Locale.ENGLISH, "\t%s\t%s\t%s\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%.4e\n", strType, hit.m_strExonGroup, hit.m_strConditionA, hit.m_strConditionB, hit.m_fAltExonCovPerBaseA, hit.m_fAltExonCovPerBaseB, hit.m_fFractionChangeAbsolute, hit.m_fFractionChangeRelative, hit.m_fPValue);
 		}
 		
 		return strRes;

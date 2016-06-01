@@ -479,9 +479,9 @@ public class RandomJunctionReader
 					byte pBuffer[] = new byte[mapIdxToSamples.keySet().size()*4];
 					pIn.read(pBuffer);
 					
-					IntBuffer pBufferInt = ByteBuffer.wrap(pBuffer).asIntBuffer();
+					IntBuffer pIntbuffer = ByteBuffer.wrap(pBuffer).asIntBuffer();
 					int pCounts[] = new int[mapIdxToSamples.keySet().size()];
-					pBufferInt.get(pCounts);
+					pIntbuffer.get(pCounts);
 
 					int i=0;
 					for(String strSample : mapIdxToSamples.keySet())

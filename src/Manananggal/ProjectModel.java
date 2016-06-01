@@ -10,6 +10,12 @@ import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Scanner;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -21,19 +27,23 @@ import org.zkoss.zul.Messagebox;
 import BioKit.Exon;
 import BioKit.Gene;
 
-public class ProjectModel
-{
+public class ProjectModel implements Comparable<ProjectModel>
+{	
 	private String m_strProjectFilePath;
 	private String m_strProjectName;
 	private String m_strJunctionCountPath;
+	private String m_strCreationDate;
 	private TreeMap<String, TreeSet<String>> m_mapConditonsToConditionTypes;
-	private TreeSet<Sample>	m_vcSamples;
+	private TreeMap<String, TreeSet<String>> m_mapSamplesToIndividuals;
+	private TreeSet<Sample>	m_vcSamples;	
 	private boolean bIsReady;
-	private TreeMap<String, RandomJunctionReader> m_mapJunctionReader; // one junction reader per condition
+	private boolean m_bDataIsPaired;
+	private TreeMap<String, RandomJunctionReader> m_mapJunctionReader; // one junction reader per condition	
 	
 	private class Sample implements Comparable<Sample>
 	{
 		String m_strName;
+		String m_strIndividual;
 		String m_strBigWigFile;
 		String m_strJunctionFile;
 		double m_fSizeFactor;
@@ -43,9 +53,10 @@ public class ProjectModel
 		
 		Sample()
 		{
-			m_strName			= "???";
-			m_strBigWigFile  	= "???";
-			m_strJunctionFile 	= "???";
+			m_strName			= "?";
+			m_strBigWigFile  	= "?";
+			m_strJunctionFile 	= "?";
+			m_strIndividual		= "?";
 			m_fSizeFactor		= 0.0;
 			m_mapConditionTypeToConditions = new TreeMap<String, String>();
 		}
@@ -62,10 +73,13 @@ public class ProjectModel
 		m_strProjectFilePath			= "?";
 		m_strProjectName				= "?";
 		m_strJunctionCountPath			= "?";
+		m_strCreationDate				= "?";
 		m_mapConditonsToConditionTypes	= new TreeMap<String, TreeSet<String>>();
+		m_mapSamplesToIndividuals		= new TreeMap<String, TreeSet<String>>();
 		m_vcSamples 					= new TreeSet<Sample>();
 		bIsReady 						= false;
 		m_mapJunctionReader				= new TreeMap<String, RandomJunctionReader>();
+		m_bDataIsPaired					= false;
 	}
 
 	public void clear()
@@ -73,6 +87,7 @@ public class ProjectModel
 		m_strProjectFilePath			= "?";
 		m_strProjectName				= "?";
 		m_strJunctionCountPath			= "?";
+		m_strCreationDate				= "?";
 		bIsReady 						= false;
 		m_mapJunctionReader				= new TreeMap<String, RandomJunctionReader>();
 		
@@ -103,7 +118,11 @@ public class ProjectModel
 		}
 		
 		System.out.println("Initializing project: " + m_strProjectName);
-		System.out.println("Project path: " + m_strProjectFilePath);
+		
+		Path path = Paths.get(strProjectFile);
+		BasicFileAttributes att = Files.readAttributes(path, BasicFileAttributes.class);
+		DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+		m_strCreationDate = df.format(att.creationTime().toMillis());
 		
 		Scanner pScanner = new Scanner(new File(strProjectFile));
 		
@@ -143,15 +162,57 @@ public class ProjectModel
 			String strLine = pScanner.nextLine();
 			pSplit = strLine.split("\t");
 			
+			if(pSplit.length < 5)
+			{
+				System.out.println("invalid line in project file: " + strLine);
+				continue;
+			}
+			
 			Sample sample = new Sample();
 
 			for(String strColumn : mapColumns.keySet())
 			{
 				switch(strColumn)
 				{
-					case "sample": 					sample.m_strName 			= pSplit[mapColumns.get(strColumn)].trim(); break;
-					case "bigwig_files": 			sample.m_strBigWigFile 		= pSplit[mapColumns.get(strColumn)].trim(); break;
-					case "junction_count_files": 	sample.m_strJunctionFile 	= pSplit[mapColumns.get(strColumn)].trim(); break;
+					case "sample":
+					{
+						sample.m_strName = pSplit[mapColumns.get(strColumn)].trim();
+						break;
+					}
+					case "individual":
+					{
+						m_bDataIsPaired = true;
+						sample.m_strIndividual = pSplit[mapColumns.get(strColumn)].trim();
+						break;
+					}
+					case "bigwig_files":
+					{
+						sample.m_strBigWigFile = pSplit[mapColumns.get(strColumn)].trim();
+						
+						// check if file exists on data load
+						if(bLoadJunctionCounts)
+						{
+							File pFile = new File(sample.m_strBigWigFile);
+							if(!pFile.exists())
+							{
+								try
+								{
+									Messagebox.show("Missing file specified in project file: " + sample.m_strBigWigFile);
+								}
+								catch(Exception e)
+								{
+									System.out.println("Missing file specified in project file: " + sample.m_strBigWigFile);
+								}
+								return false;
+							}
+						}
+						break;
+					}
+					case "junction_count_files":
+					{
+						sample.m_strJunctionFile = pSplit[mapColumns.get(strColumn)].trim();						
+						break;
+					}
 					case "size_factors":
 					{
 						String strNumber = pSplit[mapColumns.get(strColumn)].trim();
@@ -178,12 +239,64 @@ public class ProjectModel
 				}
 			}
 			
+			// get path to junction counts
 			if(m_strJunctionCountPath.equals("?"))
 			{
 				File pFile = new File(sample.m_strJunctionFile);
 				String strFullPath = pFile.getAbsolutePath();
 				m_strJunctionCountPath = strFullPath.substring(0, strFullPath.lastIndexOf(File.separatorChar));
-				System.out.println("junction count path: "+ m_strJunctionCountPath);
+			}
+						
+			// check if file exists on data load
+			if(bLoadJunctionCounts)
+			{
+				boolean bMergedFilesExist = true;
+				// it's sufficient if the merged files exist
+				// use first condition type by default
+				String strConditionType = m_mapConditonsToConditionTypes.firstKey();
+				
+				for(String strCondition : m_mapConditonsToConditionTypes.get(strConditionType))
+				{
+					// check if the merged and indexed junction count table exists				
+					String strMergedJunctionCountFile = m_strJunctionCountPath + "/" + strCondition + ".merged_junction_counts.dat";
+
+					File pFile = new File(strMergedJunctionCountFile);
+					if(!pFile.exists())
+					{
+						bMergedFilesExist = false;
+						break;
+					}
+				}
+				
+				File pFile = new File(sample.m_strJunctionFile);
+				if(!pFile.exists() && !bMergedFilesExist)
+				{
+					try
+					{
+						Messagebox.show("Missing file specified in project file: " + sample.m_strJunctionFile);
+						return false;
+					}
+					catch(Exception e)
+					{
+						System.out.println("Missing file specified in project file: " + sample.m_strJunctionFile);
+						pScanner.close();
+						return false;
+					}					
+				}
+			}
+			
+			if(m_bDataIsPaired)
+			{
+				if(m_mapSamplesToIndividuals.containsKey(sample.m_strIndividual))
+				{
+					m_mapSamplesToIndividuals.get(sample.m_strIndividual).add(sample.m_strName);
+				}
+				else
+				{
+					TreeSet<String> vcSamples = new TreeSet<String>();
+					vcSamples.add(sample.m_strName);
+					m_mapSamplesToIndividuals.put(sample.m_strIndividual, vcSamples);
+				}				
 			}
 			
 			m_vcSamples.add(sample);
@@ -236,13 +349,19 @@ public class ProjectModel
 				m_mapJunctionReader.put(strCondition, reader);
 			}
 		}
+		pScanner.close();
 		
 		bIsReady = true;
 		
-		pScanner.close();
+		if(m_bDataIsPaired)
+		{
+			if(!ValidatePairedData())
+				return false;
+		}
+				
 		return true;
 	}
-
+	
 	public boolean IsReady()
 	{
 		return bIsReady;
@@ -250,7 +369,25 @@ public class ProjectModel
 	
 	public String GetProjectName()
 	{
-		return m_strProjectName;
+		if(m_strProjectName == null || m_strProjectName.isEmpty())
+			return null;
+		
+		int nLastDot = m_strProjectName.lastIndexOf(".");
+		
+		if(nLastDot == -1)
+			return null;
+		
+		return m_strProjectName.substring(0, nLastDot);
+	}
+	
+	public String GetCreationDate()
+	{
+		return m_strCreationDate;
+	}
+	
+	public String GetFullPathOfProjectFile()
+	{
+		return m_strProjectFilePath + "/" + this.m_strProjectName; 
 	}
 	
 	public void MergeJunctionTable(String strCondition, String strConditionType, String strMergedFile, int nMergingJunctions_minSamples, int nMergingJunctions_minSampleCoverage, double fMergingJunctions_MinAverageCount, int nMergingJunctions_minCoverageSingleSample) throws IOException
@@ -504,10 +641,42 @@ public class ProjectModel
 		
 		return mapSamplesToConditions;
 	}
+	
+	public TreeMap<String, TreeSet<String>> GetSelectedSamplesPerCondition(String strConditionType, TreeSet<String> vcSelectedSamples)
+	{
+		TreeMap<String, TreeSet<String>> mapSamplesToConditions = new TreeMap<String, TreeSet<String>>();
+
+		for(Sample sample : m_vcSamples)
+		{
+			if(!vcSelectedSamples.contains(sample.m_strName))
+				continue;
+			
+			String strCondition = sample.m_mapConditionTypeToConditions.get(strConditionType);
+			
+			if(mapSamplesToConditions.containsKey(strCondition))
+			{
+				TreeSet<String> vcTmp = mapSamplesToConditions.get(strCondition);
+				vcTmp.add(sample.m_strName);
+			}
+			else
+			{
+				TreeSet<String> vcTmp = new TreeSet<String>();
+				vcTmp.add(sample.m_strName);
+				mapSamplesToConditions.put(strCondition, vcTmp);
+			}
+		}
+		
+		return mapSamplesToConditions;
+	}
 
 	public TreeMap<String, TreeSet<String>> GetConditionsToConditionTypes()
 	{
 		return m_mapConditonsToConditionTypes;
+	}
+	
+	public TreeMap<String, TreeSet<String>> GetSamplesPerIndividual()
+	{
+		return m_mapSamplesToIndividuals;
 	}
 	
 	public TreeSet<String> GetConditions(String strConditionType)
@@ -812,7 +981,6 @@ public class ProjectModel
 		}
 		
 		// get index
-		System.out.println("getting index");
 		long nFileOffset = -1;
 		while(pInIdx.hasNextLine())
 		{
@@ -835,7 +1003,6 @@ public class ProjectModel
 		}
 		
 		// get data
-		System.out.println("getting data");
 		pInData.seek(nFileOffset);
 		while(pInData.getFilePointer() < pInData.length())
 		{
@@ -1173,4 +1340,58 @@ public class ProjectModel
 		return vcResults;
 	}
 
+	@Override
+	public int compareTo(ProjectModel other)
+	{
+		return m_strProjectName.compareTo(other.m_strProjectName);
+	}
+
+	// check whether the data is paired for the given conditions
+	boolean ValidatePairedData()
+	{
+		for(String strIndividual : m_mapSamplesToIndividuals.keySet())
+		{
+			if(m_mapSamplesToIndividuals.get(strIndividual).size() > 2)
+			{
+				System.out.println("WARNING: Disabling paired testing");
+				System.out.println("ERROR: detected more than two samples for individual " + strIndividual);
+				System.out.println(m_mapSamplesToIndividuals.get(strIndividual));
+				m_bDataIsPaired = false;
+				return false;
+			}
+		}
+		
+		return true;
+	}
+	
+	public boolean ConditionsHavePairedData(String strConditionType, String strConditionA, String strConditionB)
+	{
+		if(!m_bDataIsPaired)
+			return false;
+		
+		TreeMap<String, TreeSet<String>> mapSamplesToConditions = GetSamplesPerCondition(strConditionType);
+		
+		// to be valid, all samples in condition A must belong to the same individual as the samples in condition B
+		TreeSet<String> vcIndividualsA = new TreeSet<String>();
+		TreeSet<String> vcIndividualsB = new TreeSet<String>();
+		
+		for(Sample sample : m_vcSamples)
+		{
+			if(mapSamplesToConditions.get(strConditionA).contains(sample.m_strName))
+				vcIndividualsA.add(sample.m_strIndividual);
+			
+			if(mapSamplesToConditions.get(strConditionB).contains(sample.m_strName))
+				vcIndividualsB.add(sample.m_strIndividual);
+		}
+		
+		if(vcIndividualsA.equals(vcIndividualsB))
+			return true;
+		
+		return false;
+	}
+	
+	boolean ProjectHasPairedData()
+	{
+		return m_bDataIsPaired;
+	}
 }

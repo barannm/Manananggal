@@ -102,6 +102,22 @@ public class RandomAccessGFFReader
 	 * @throws Exception
 	 */
 	
+	public String GetFileName()
+	{
+		return m_strGTF;
+	}
+	
+	public long GetIndexForGene(String strGeneID)
+	{
+		int nHashID = strGeneID.hashCode();
+		if(m_pIndex.containsKey(nHashID))
+		{
+			return m_pIndex.get(nHashID);
+		}
+		
+		return 0;
+	}
+	
 	public Gene ReadGene(String strGeneID) throws IOException
 	{
 		Gene gene = null;
@@ -110,7 +126,7 @@ public class RandomAccessGFFReader
 		{
 			long position = m_pIndex.get(nHashID);
 			
-			BufferedReader pReader = new BufferedReader(new FileReader(new File(m_strGTF)));
+			RandomAccessFile pReader = new RandomAccessFile(m_strGTF, "r");
 			
 			GTFParser parser = new GTFParser(pReader, position);
 			gene = parser.nextGene().createGene();
@@ -122,7 +138,7 @@ public class RandomAccessGFFReader
 		return null;
 	}
 	
-	public TreeSet<Gene> GetGenesForRange(String strRef, int nStart, int nEnd) throws IOException
+	public TreeSet<Gene> GetGenesForRange(String strRef, int nStart, int nEnd)
 	{
 		if(!m_pIndexPositions.containsKey(strRef))
 		{
@@ -132,20 +148,50 @@ public class RandomAccessGFFReader
 		
 		TreeSet<Gene> vcGenes = new TreeSet<Gene>();
 		
+		RandomAccessFile pReader = null;
+		try
+		{
+			pReader = new RandomAccessFile(m_strGTF, "r");
+		}
+		catch(Exception e)
+		{
+			System.out.println("failed to open file: " + m_strGTF);
+			e.printStackTrace();
+			return null;
+		}
+		
 		for(Map.Entry<Range, Long> e : m_pIndexPositions.get(strRef).entrySet())
 		{
 			Range r = e.getKey();
 			
-			if(r.end >= nStart && r.start <= nEnd)
+			if(r.end < nStart)
+				continue;
+			
+			if(r.start > nEnd)
+				break;
+			
+			try
 			{
-				BufferedReader pReader = new BufferedReader(new FileReader(new File(m_strGTF)));
 				GTFParser parser = new GTFParser(pReader, e.getValue());
 				Gene gene = parser.nextGene().createGene();
-				
 				vcGenes.add(gene);
-				
-				pReader.close();
 			}
+			catch(Exception ex)
+			{
+				System.out.println("failed to create GTF parser to parse file: " + m_strGTF);
+				ex.printStackTrace();
+				return null;
+			}
+		}
+		
+		try
+		{
+			pReader.close();
+		}
+		catch(Exception e)
+		{
+			System.out.println("failed to close file: " + m_strGTF);
+			e.printStackTrace();
 		}
 		
 		return vcGenes;
@@ -210,14 +256,56 @@ public class RandomAccessGFFReader
 	{
 		String strLine = null;
 		
-		PrintWriter writer = new PrintWriter(new FileWriter(indexFile));
-		
 		BufferedReader pReader = new BufferedReader(new FileReader(new File(m_strGTF)));
 		
 		long nBytesRead = 0;		
 		int counter = 0;
 		
 		boolean bGeneKeyWord = false;
+		
+		// determine file encoding
+		int nFileMode = -1;	// -1 = UNKNOWN, 0 = UNIX, 1 = WINDOWS
+		
+		// determine file mode
+		while(true)
+		{
+			int nChar = pReader.read();
+			if(nChar == -1)
+				break;
+			
+			char ch = (char)nChar;
+			
+			if(ch == '\n')
+				nFileMode = 0;
+			
+			if(ch == '\r')
+			{
+				nChar = pReader.read();
+				if(nChar == -1)
+					break;
+				
+				ch = (char)nChar;
+				if(ch == 'n')
+					nFileMode = 1;
+			}
+		}
+		pReader.close();
+	
+		if(nFileMode == -1)
+		{
+			System.out.println("RandomAccessGTFReader -> Unable to determine whether the file is in UNIX or Windows format.");
+			
+			// delete empty file
+			File pFile = new File(m_strGTF);
+			pFile.delete();
+			return;
+		}
+		
+		pReader.close();
+		
+		// read file contents and write index file
+		pReader = new BufferedReader(new FileReader(new File(m_strGTF)));
+		PrintWriter pWriter = new PrintWriter(new FileWriter(indexFile));
 		
 		while((strLine = pReader.readLine()) != null)
 		{
@@ -266,20 +354,27 @@ public class RandomAccessGFFReader
 					m_pIndexPositions.put(strRef, mapRangeToFileOffset);
 				}
 				
-				writer.println(strGeneID + "\t" + pSplit[0] + "\t" + pSplit[3] + "\t" + pSplit[4] + "\t" + nBytesRead);
+				pWriter.println(strGeneID + "\t" + pSplit[0] + "\t" + pSplit[3] + "\t" + pSplit[4] + "\t" + nBytesRead);
 				
 				counter++;
 				
 				if(counter%100 == 0)
 					System.out.println("Process Sequence " + counter);
 			}
-			nBytesRead += strLine.getBytes("UTF-8").length + System.lineSeparator().getBytes("UTF-8").length;
+			
+			if(counter < 10)
+				System.out.println("Bytes: " + strLine.getBytes().length + " "+ strLine);
+			
+			if(nFileMode == 0)
+				nBytesRead += strLine.getBytes("UTF-8").length + 1;
+			else
+				nBytesRead += strLine.getBytes("UTF-8").length + 2;
 		}
 		pReader.close();
 		
 		if(!bGeneKeyWord)
 		{
-			System.out.println("missing gene specific lines -> try to do it on exons");
+			System.out.println("missing gene specific lines -> trying exon lines now");
 			pReader = new BufferedReader(new FileReader(new File(m_strGTF)));
 			
 			nBytesRead = 0;		
@@ -341,7 +436,7 @@ public class RandomAccessGFFReader
 								m_pIndexPositions.put(strRef, mapRangeToFileOffset);
 							}
 							
-							writer.println(strLastGene + "\t" + strGeneRef + "\t" + nGeneStart + "\t" + nGeneEnd + "\t" + nGeneStartPos);
+							pWriter.println(strLastGene + "\t" + strGeneRef + "\t" + nGeneStart + "\t" + nGeneEnd + "\t" + nGeneStartPos);
 						}
 						
 						nGeneStart = nStart;
@@ -363,7 +458,11 @@ public class RandomAccessGFFReader
 					if(counter%100 == 0)
 						System.out.println("Process Sequence " + counter);
 				}
-				nBytesRead += strLine.getBytes("UTF-8").length + System.lineSeparator().getBytes("UTF-8").length;
+
+				if(nFileMode == 0)
+					nBytesRead += strLine.getBytes("UTF-8").length + 1;
+				else
+					nBytesRead += strLine.getBytes("UTF-8").length + 2;
 			}
 
 			if(strLastGene != null)
@@ -390,15 +489,15 @@ public class RandomAccessGFFReader
 					m_pIndexPositions.put(strGeneRef, mapRangeToFileOffset);
 				}
 				
-				writer.println(strLastGene + "\t" + strGeneRef + "\t" + nGeneStart + "\t" + nGeneEnd + "\t" + nGeneStartPos);
+				pWriter.println(strLastGene + "\t" + strGeneRef + "\t" + nGeneStart + "\t" + nGeneEnd + "\t" + nGeneStartPos);
 			// write last entry
 			}
 			
 			pReader.close();
 		}
 
-		writer.flush();
-		writer.close();
+		pWriter.flush();
+		pWriter.close();
 	}
 	
 	/**

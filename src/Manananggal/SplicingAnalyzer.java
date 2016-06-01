@@ -1,6 +1,5 @@
 package Manananggal;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Iterator;
@@ -13,7 +12,6 @@ import org.broad.igv.bbfile.WigItem;
 
 import BioKit.Exon;
 import BioKit.ExonAndSpliceJunctionCoverage;
-import BioKit.GTFParser;
 import BioKit.Gene;
 import BioKit.RandomAccessGFFReader;
 
@@ -34,21 +32,24 @@ public class SplicingAnalyzer
 		{
 			System.out.println("searching for alternatively spliced exons");
 
-			boolean bRunInDebugMode 		= false;
-			boolean bSkipFirstAndLastExons 	= false;
-			String strFirstGene 			= null;
-			int	nThreads					= 4;
+			boolean bRunInDebugMode 				= false;
+			boolean bSkipFirstAndLastExons 			= false;
+			boolean bDetectIntronRetentionEvents	= true;
+			String strFirstGene 					= null;
+			int	nThreads							= 4;
 			
 			for(String strParameter : args)
 			{
 				if(strParameter.equals("-debug")) 				bRunInDebugMode = true;
 				if(strParameter.equals("-skipFirstAndLast")) 	bSkipFirstAndLastExons = true;
+				if(strParameter.equals("-skipIntronDetection")) bDetectIntronRetentionEvents = false;
 				if(strParameter.startsWith("-startAt"))			strFirstGene = strParameter.split("=")[1];
 				if(strParameter.startsWith("-threads"))			nThreads = Integer.parseInt(strParameter.split("=")[1]);
 			}
-			
-			app.SetParameters(Integer.parseInt(args[3]), Integer.parseInt(args[4]), Double.parseDouble(args[5]), Double.parseDouble(args[6]), 4, args[7].trim(), args[0].trim());
-			app.RunAnalysis(args[0].trim(), args[1].trim(), args[2].trim(), strFirstGene, bSkipFirstAndLastExons, bRunInDebugMode, nThreads);
+	
+			app.SetParameters(Integer.parseInt(args[3]), Integer.parseInt(args[4]), Double.parseDouble(args[5]), Double.parseDouble(args[6]), 4, args[7].trim(), args[0].trim(), bDetectIntronRetentionEvents);
+			AnalyzerGeneFactory analyzer = new AnalyzerGeneFactory();
+			analyzer.RunCompleteAnalysis(app, args[0].trim(), args[1].trim(), args[2].trim(), strFirstGene, bSkipFirstAndLastExons, bRunInDebugMode, nThreads);
 		}
 		else if(args[0].trim().equals("merge") && args.length > 1)
 		{
@@ -67,11 +68,6 @@ public class SplicingAnalyzer
 			}
 			else
 				project.Init(strProject, -1, -1, -1, -1, true);
-		}
-		else if(args.length == 2 && args[0].trim().equals("convert"))
-		{
-			System.out.println("converting hits to new format");
-			app.ConvertHitList(args[1].trim());
 		}
 		else if(args.length == 3 && args[0].trim().equals("calculate_size_factors"))
 		{
@@ -210,6 +206,8 @@ public class SplicingAnalyzer
 				catch(IOException ex)
 				{
 					System.out.println(ex.getMessage());
+					pIn.close();
+					pOut.close();
 					return;
 				}
 
@@ -328,6 +326,8 @@ public class SplicingAnalyzer
 				catch(IOException ex)
 				{
 					System.out.println(ex.getMessage());
+					pIn.close();
+					pOut.close();
 					return;
 				}
 

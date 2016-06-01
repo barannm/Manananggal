@@ -137,22 +137,22 @@ public class ExonAndSpliceJunctionCoverage
 			pFileWriterExons	 = new FileWriter(outputPrefix+".exon_cnts.tsv");
 			pFileWriterJunctions = new FileWriter(outputPrefix+".junction_cnts.tsv");
 			
-			pWriterExons	 = new PrintWriter(pFileWriterExons);
-			pWriterJunctions = new PrintWriter(pFileWriterJunctions);
+			pWriterExons	 = new PrintWriter(pFileWriterExons, true);
+			pWriterJunctions = new PrintWriter(pFileWriterJunctions, true);
 			
 			if(bAdditionalFileOutput)
 			{
 				pFileWriterIntrons = new FileWriter(outputPrefix+".intron_cnts.tsv");
 				pFileWriterPaired  = new FileWriter(outputPrefix+".paired_cnts.tsv");
 				
-				pWriterIntrons = new PrintWriter(pFileWriterIntrons);
-				pWriterPaired  = new PrintWriter(pFileWriterPaired);
+				pWriterIntrons = new PrintWriter(pFileWriterIntrons, true);
+				pWriterPaired  = new PrintWriter(pFileWriterPaired, true);
 			}
 		}
 		else
 		{
 			pFileWriterExons	= new FileWriter(outputPrefix+".combined_cnts.tsv");
-			pWriterExons	 	= new PrintWriter(pFileWriterExons);
+			pWriterExons	 	= new PrintWriter(pFileWriterExons, true);
 		}
 		
 		//############################
@@ -269,20 +269,28 @@ public class ExonAndSpliceJunctionCoverage
 		}
 		
 		pWriterExons.flush();
-		pWriterExons.close();
+		pWriterExons.close();		
+		pFileWriterExons.flush();
+		pFileWriterExons.close();
 		
 		if(bMultiFileOutput)
 		{
 			pWriterJunctions.flush();
 			pWriterJunctions.close();
+			pFileWriterJunctions.flush();
+			pFileWriterJunctions.close();
 
 			if(bAdditionalFileOutput)
 			{
 				pWriterIntrons.flush();
 				pWriterIntrons.close();
+				pFileWriterIntrons.flush();
+				pFileWriterIntrons.close();
 				
 				pWriterPaired.flush();
 				pWriterPaired.close();
+				pFileWriterPaired.flush();
+				pFileWriterPaired.close();
 			}
 		}
 	}

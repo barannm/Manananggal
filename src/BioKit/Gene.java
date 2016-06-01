@@ -58,6 +58,9 @@ public class Gene implements Comparable<Gene>, Serializable
 	// allows to add properties to the gene
 	private HashMap<String, Object> properties;
 	
+	private TreeMap<String, Integer> mapCDSstartToIsoforms;
+	private TreeMap<String, Integer> mapCDSendToIsoforms;
+	
 	public Gene(String geneID, int start, int stop, String chromosome, boolean plusStrand)
 	{
 		this.geneID = geneID;
@@ -118,6 +121,38 @@ public class Gene implements Comparable<Gene>, Serializable
 	      addExon(exon);
 	    }
 	    return true;
+	}
+	
+	public void SetCDSPositions(TreeMap<String, Integer> mapCDSstart, TreeMap<String, Integer> mapCDSend)
+	{
+		mapCDSstartToIsoforms = mapCDSstart;
+		mapCDSendToIsoforms	  = mapCDSend;
+	}
+	
+	public int GetCodingStartForIsoform(String strIsoform)
+	{
+		if(mapCDSstartToIsoforms.containsKey(strIsoform))
+			return mapCDSstartToIsoforms.get(strIsoform);
+		else
+		{
+			if(isPlusStrand())
+				return Integer.MIN_VALUE;
+			else
+				return Integer.MAX_VALUE;
+		}			
+	}
+	
+	public int GetCodingEndForIsoform(String strIsoform)
+	{
+		if(mapCDSendToIsoforms.containsKey(strIsoform))
+			return mapCDSendToIsoforms.get(strIsoform);
+		else
+		{
+			if(isPlusStrand())
+				return Integer.MAX_VALUE;
+			else
+				return Integer.MIN_VALUE;
+		}	
 	}
 	
 	/**

@@ -29,6 +29,7 @@ public class Exon extends GeneticElement implements MappableElement, Sequence, S
 	private CompressedNucleotideSequence completeNucleotideSequence;
 	private Nucleotide[] nucleotides;
 	private HashSet<String> coveredTranscripts;
+	private int m_nFrame;
 	
 	/**
 	 * Standard constructor, initializes the exon
@@ -43,18 +44,24 @@ public class Exon extends GeneticElement implements MappableElement, Sequence, S
 		super(codingStart, codingStop, codingStart, codingStop, true);
 		this.codingNucleotideSequence = new CompressedNucleotideSequence(codingNucleotideSequence);
 		this.coveredTranscripts = new HashSet<String>();
+		
+		m_nFrame = -2; // non-coding
 	}
 	
 	public Exon(int codingStart, int codingStop)
 	{
 		super(codingStart, codingStop, codingStart, codingStop, true);
 		this.coveredTranscripts = new HashSet<String>();
+		
+		m_nFrame = -2; // non-coding
 	}
 	
 	public Exon(int codingStart, int codingStop, int genomicStart, int genomicStop)
 	{
 		super(genomicStart, genomicStop, codingStart, codingStop, true);
 		this.coveredTranscripts = new HashSet<String>();
+		
+		m_nFrame = -2; // non-coding
 	}
 	
 	public Exon(int codingStart, int codingStop, int genomicStart, int genomicStop, String codingNucleotideSequence) throws IOException, Exception
@@ -73,6 +80,18 @@ public class Exon extends GeneticElement implements MappableElement, Sequence, S
 			
 		this.codingNucleotideSequence = new CompressedNucleotideSequence(codingNucleotideSequence);
 		this.coveredTranscripts = new HashSet<String>();
+		
+		m_nFrame = -2; // non-coding
+	}
+	
+	public void setFrame(int nFrame)
+	{
+		m_nFrame = nFrame;
+	}
+	
+	public int getFrame()
+	{
+		return m_nFrame;
 	}
 	
 	/**

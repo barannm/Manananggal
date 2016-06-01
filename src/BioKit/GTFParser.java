@@ -1,11 +1,11 @@
 package BioKit;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.RandomAccessFile;
 import java.util.HashMap;
+import java.util.TreeMap;
 
 /**
  * GTF parser that allows to read a GTF file gene by gene. Results are returned wrapped in GTF Gene instances. Those can be converted
@@ -17,19 +17,19 @@ import java.util.HashMap;
  */
 public class GTFParser 
 {
-	private BufferedReader reader;
+	private RandomAccessFile reader;
 	private GTFGene newGene;
 	
 	// bStrict will only read lines of type "exon" as exons (and thus skips CDS entries)
 	public GTFParser(String file) throws IOException
 	{
-		reader = new BufferedReader(new FileReader(file));
+		reader = new RandomAccessFile(file, "r");
 	}
 	
-	public GTFParser(BufferedReader newReader, long nOffset) throws IOException
+	public GTFParser(RandomAccessFile newReader, long nOffset) throws IOException
 	{
-		this.reader = newReader;
-		this.reader.skip(nOffset);
+		reader = newReader;
+		reader.seek(nOffset);		
 	}
 	
 	public GTFGene nextGene() throws IOException
@@ -50,6 +50,9 @@ public class GTFParser
 		int start = -1;
 		int stop = -1;
 		boolean isPlusStrand = true;
+		
+		TreeMap<String, Integer> mapCDSstartToIsoform	= new TreeMap<String, Integer>();
+		TreeMap<String, Integer> mapCDSendToIsoform		= new TreeMap<String, Integer>();
 
 		while((line = reader.readLine()) != null)
 		{
@@ -58,8 +61,56 @@ public class GTFParser
 			
 			try
 			{
-				// only read exon lines
-				if(!split[2].equals("exon"))
+				// collect start codons
+				if(split[2].equals("start_codon"))
+				{
+					// get position of the start codon
+					int nPos = 0;
+					if(split[6].equals("+"))
+						nPos = Integer.parseInt(split[3]);
+					else
+						nPos = Integer.parseInt(split[4]);
+					
+					// get transcript ID
+					featuresSplit = split[8].split(";");
+					
+					for(String f : featuresSplit)
+					{
+						if(f.trim().startsWith("transcript_id"))
+						{
+							transcriptID = f.replaceAll("transcript_id", "").replaceAll("\"", "").trim();
+							mapCDSstartToIsoform.put(transcriptID, nPos);
+							break;
+						}
+					}
+					continue;
+				}
+				// collect stop codons
+				else if(split[2].equals("stop_codon"))
+				{				
+					// get position of the stop codon
+					int nPos = 0;
+					if(split[6].equals("+"))
+						nPos = Integer.parseInt(split[4]);
+					else
+						nPos = Integer.parseInt(split[3]);
+					
+					// get transcript ID
+					featuresSplit = split[8].split(";");
+					
+					for(String f : featuresSplit)
+					{
+						if(f.trim().startsWith("transcript_id"))
+						{
+							transcriptID = f.replaceAll("transcript_id", "").replaceAll("\"", "").trim();
+							mapCDSendToIsoform.put(transcriptID, nPos);
+							break;
+						}
+					}
+					continue;
+				}
+				// skip everything else but exons
+				else if(!split[2].equals("exon"))
 					continue;
 				
 				chromosome = split[0];
@@ -110,9 +161,7 @@ public class GTFParser
 						geneID = transcriptID;
 
 					gene = new GTFGene(chromosome, isPlusStrand, geneID, geneName, geneType, type);
-					
 					gene.setSynonymInformation(synonyms);
-					
 					gene.addExon(transcriptID, start, stop);
 				}
 				else if(geneID.equals(gene.getId()) && gene.getChromosome().equals(chromosome))
@@ -121,6 +170,7 @@ public class GTFParser
 				}
 				else
 				{
+					// I believe everything but the break is not required here, because you set newGene to null each time you call nextGene() anyway <comment: Matthias>
 					if(geneID.equals(""))
 						geneID = transcriptID;
 					
@@ -128,6 +178,7 @@ public class GTFParser
 					newGene.setSynonymInformation(synonyms);
 					newGene.addExon(transcriptID, start, stop);
 					
+					// it is a different gene, thus break
 					break;
 				}
 			}
@@ -136,7 +187,9 @@ public class GTFParser
 				System.err.println("GTFParser could not parse line: " + line);
 			}
 		}
-		
+
+		// add cds start and end positions to gene information
+		gene.SetCDSPositions(mapCDSstartToIsoform, mapCDSendToIsoform);
 		return gene;
 	}
 	
@@ -163,7 +216,7 @@ public class GTFParser
 		
 		if(args[0].equals("-prepareUCLCGTFFile"))
 		{
-			BufferedReader reader = new BufferedReader(new FileReader(args[1]));
+			RandomAccessFile reader = new RandomAccessFile(args[1], "r");
 			String line = null;
 			
 			HashMap<String, String> transcriptToGeneMap = new HashMap<String, String>();
@@ -179,7 +232,7 @@ public class GTFParser
 			
 			System.out.println("Transcript to Gene Map size: " + transcriptToGeneMap.size());
 			
-			reader = new BufferedReader(new FileReader(args[2]));
+			reader = new RandomAccessFile(args[2], "r");
 			
 			PrintWriter writer = new PrintWriter(new FileWriter(args[3]));
 			

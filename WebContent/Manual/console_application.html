@@ -1,0 +1,280 @@
+<head>
+<link rel="stylesheet" type="text/css" href="./css/manual.css">
+</head>
+
+<body>
+	<div class="title_div">
+	<h1 class="title blood">Manananggal – Userguide</h1>
+
+	<nav class="nav_effect">
+		<ul>
+			<li>
+				<a href="./installation.html">Installation</a>
+				<ul>
+				<li><a href="./installation.html#console_app">Installing the console application</a></li>
+				<li><a href="./installation.html#web_app">Installing the web application</a></li>
+				<li><a href="./installation.html#crossref">Cross-reference file</a></li>
+				<li><a href="./installation.html#counts_tissue_gene">Tissue specific gene expression</a></li>
+				<li><a href="./installation.html#counts_tissue_exon">Tissue specific exon expression</a></li>			
+				</ul>
+			</li>
+			<li>
+				<a href="./new_project.html">Adding projects</a>
+				<ul>
+					<li><a href="./new_project.html#requirements">Requirements</a></li>
+					<li><a href="./new_project.html#bigwig">Generation of BigWig files</a></li>
+					<li><a href="./new_project.html#count_files">Generation of count files</a></li>
+					<li><a href="./new_project.html#project_file">Preparing the project file</a></li>
+					<li><a href="./new_project.html#merging">Merging junction count files</a></li>
+				</ul>
+			</li>
+			<li>
+				<a href="./console_application.html">The console app</a>
+				<ul>
+					<li><a href="./console_application.html#running">Running the Console Application</a></li>
+					<li><a href="./console_application.html#output">Output Format</a></li>						
+				</ul>
+			</li>
+			<li><a href="./viewer.html">The viewer</a>
+				<ul>
+					<li><a href="./viewer.html#Overview">Overview</a></li>
+					<li><a href="./viewer.html#Settings">Settings Menu</a></li>
+					<li><a href="./viewer.html#Options">Option Menu</a></li>
+					<li><a href="./viewer.html#Samples">Sample Selection</a></li>
+					<li><a href="./viewer.html#Colors">Sample Colors</a></li>
+					<li><a href="./viewer.html#Isoforms">Isoform Selection</a></li>
+					<li><a href="./viewer.html#AdvancedOptions">Advanced Options Menu</a></li>
+					<li><a href="./viewer.html#Results">Results Window</a></li>
+					<li><a href="./viewer.html#Coverage">Coverage Plot</a></li>
+					<li><a href="./viewer.html#IsoformPlot">Isoform Plot</a></li>
+				</ul>
+			</li>
+			<li><a href="./interpreting_results.html">Interpreting results</a></li>
+		</ul>
+	</nav>
+	</div>
+	
+	<div class="content_div">
+	
+		<a class="anchor" id="running">&nbsp;</a>
+		<section class=mysection>
+			<header><h1>Running the Console Application</h1></header>
+			<div class=mydiv>
+				<p>The console application can be run for a project to identify alternative splicing events. The following line shows how to invoke Manananggal console application.</p>
+				<div class=div_code>
+					<p>java -cp /Manananggal/lib/*:/Manananggal.jar Manananggal.SplicingAnalyzer reference.gtf my.project condition_type minJunctionReads minCovPerBase minFracCoveredBases minRatioDiff biomart_cross_ref.txt -skipFirstAndLast -skipIntronDetection -threads=8</p>
+				</div>
+			
+				<p>The following table explains the parameters:</p>
+				<div class=table>
+					<div class="row header">
+						<div class=cell>Parameter</div>
+						<div class=cell>Description</div>
+						<div class=cell>Example</div>
+					</div>
+					<div class="row">
+						<div class=cell>reference.gtf</div>
+						<div class=cell>Must be the full path to a GTF file.</div>
+						<div class=cell></div>
+					</div>
+					<div class="row">
+						<div class=cell>my.project</div>
+						<div class=cell>Must be the full path to a project file.</div>
+						<div class=cell></div>
+					</div>
+					<div class="row">
+						<div class=cell>condition_type</div>
+						<div class=cell>The condition type refers to the freely named columns in the project file. In the example we specified the column headers "condition" and "tissue", which can be used for sample grouping.</div>
+						<div class=cell>condition</div>
+					</div>
+					<div class="row">
+						<div class=cell>minJunctionReads</div>
+						<div class=cell>Defines the minimum coverage for valid junctions.</div>
+						<div class=cell>3</div>
+					</div>
+					<div class="row">
+						<div class=cell>minCovPerBase</div>
+						<div class=cell>Defines the minimum coverage per base for valid exons.</div>
+						<div class=cell>5</div>
+					</div>
+					<div class="row">
+						<div class=cell>minFracCoveredBases</div>
+						<div class=cell>Defines the minimum number of covered bases for valid exons as fraction of: covered_bases / total_number_of_bases</div>
+						<div class=cell>0.7</div>
+					</div>
+					<div class="row">
+						<div class=cell>minRatioDiff</div>
+						<div class=cell>Defines a threshold for the coverage ratio difference. Alternative splicing events with a difference below the specified value will not be reported.</div>
+						<div class=cell>0.05</div>
+					</div>
+					<div class="row">
+						<div class=cell>biomart_cross_ref.txt</div>
+						<div class=cell>Must be the full path to a cross reference file.</div>
+						<div class=cell></div>
+					</div>					
+					<div class="row">
+						<div class=cell>-skipFirstAndLast</div>
+						<div class=cell>If specified, first and last exons will not be used when discarding insufficiently covered isoforms. Additionally, they will not be used when testing for exon coverage differences for exon skipping events.</div>
+						<div class=cell></div>
+					</div>
+					<div class="row">
+						<div class=cell>-skipIntronDetection</div>
+						<div class=cell>If specified, intron retention events will not be detected. This is advisable for large samples numbers, because detection of intron retention requires a lot of memory and time.</div>
+						<div class=cell></div>
+					</div>
+					<div class="row">
+						<div class=cell>threads</div>
+						<div class=cell>Defines the maximum number of threads available to the application.</div>
+						<div class=cell>8</div>
+					</div>
+				</div>
+				<p>Results will be generated in the directory where the program was started.</p>
+			</div>
+		</section>
+		
+		<a class="anchor" id="output">&nbsp;</a>
+		<section class=mysection>
+			<header><h1>Output format</h1></header>
+			<div class=mydiv>
+				<p>Four output files will be generated (or three if intron retention detection was disabled).
+				The output file naming scheme is: <font style="color: hsl(100,100%,50%)">[time stamp]_[project name]_[parameters used]_[event type]</font>,
+				where event types are <font style="color: hsl(230, 100%, 70%);">SE</font> (skipped exons), <font style="color: hsl(230, 100%, 70%);">ATE</font>
+				(alternative terminal exons), <font style="color: hsl(230, 100%, 70%);">EE</font> (exon extensions, excluding UTRs) and <font style="color: hsl(230, 100%, 70%);">RI</font> (retained introns).</p>
+
+				<p>The output table contains the following information:</p>
+				<div class=table>
+					<div class="row header">					
+						<div class=cell>Name</div>
+						<div class=cell>Description</div>
+						<div class=cell>Example</div>
+					</div>
+					<div class="row">					
+						<div class=cell>ID</div>
+						<div class=cell>The event ID.</div>
+						<div class=cell>ID_30121</div>
+					</div>
+					<div class="row">					
+						<div class=cell>ENSEMBL_ID</div>
+						<div class=cell>Ensembl gene identifier.</div>
+						<div class=cell>ENSG00000133961.15</div>
+					</div>
+					<div class="row">					
+						<div class=cell>gene_symbol</div>
+						<div class=cell>The gene symbol</div>
+						<div class=cell>NUMB</div>
+					</div>
+					<div class="row">					
+						<div class=cell>type</div>
+						<div class=cell>Evidence support type: combined, ratio_only or split_reads_only.<br>
+										<font style="font-size: 75%"><font style="font-weight: 600">combined</font>: Event shows a difference in both coverage ratio and split read count.<br>
+										<font style="font-weight: 600">ratio only</font>: Event shows only a difference in coverage ratio.<br>
+										<font style="font-weight: 600">split_read_only</font>: Event shows only a difference in split read counts.</font></div>
+						<div class=cell>combined</div>
+					</div>
+					<div class="row">					
+						<div class=cell>AS_type</div>
+						<div class=cell>Type of the event.<br><font style="font-size: 75%">
+									This can be exon_skipping for <font style="color: hsl(230, 100%, 70%); font-weight:800;">SE</font>, alt_[start|end]_unique_jun, alt_[start|end]_unique_jun_double, alt_[start|end]_shared_jun
+									or alt_[start|end]_shared_jun_double for <font style="color: hsl(230, 100%, 70%); font-weight:800;">ATE</font>, alt_3_prime_exon_end, alt_5_prime_exon_end for
+									<font style="color: hsl(230, 100%, 70%); font-weight:800;">EE</font> and retained_intron for <font style="color: hsl(230, 100%, 70%); font-weight:800;">RI.</font><br>
+									<font style="font-weight: 600">alt_[start|end]_unique_jun</font> means that the alternative start (or end exon) has a junction that is unique to the terminal exon, whereas 'shared' means the junction is
+									also used by non-terminal exons.<br>
+									<font style="font-weight: 600">'Double'</font> means the event includes two terminal exons that show signs of alternative splicing. Please note that some gene annotations might include
+									incomplete isoforms which makes the program believe it found a terminal exon although in reality it is a non-terminal exon.</font>
+						</div>
+						<div class=cell>exon_skipping</div>
+					</div>
+					<div class="row">					
+						<div class=cell>grp_position</div>
+						<div class=cell>Position of the alternatively spliced exon group (meta exon). In case of exon skipping events, this will be the coordinates of the skipped exon.</div>
+						<div class=cell>chr14:73745989-73746132</div>
+					</div>
+					<div class="row">					
+						<div class=cell>conditionA</div>
+						<div class=cell>Name of the first condition</div>
+						<div class=cell>NT_PRAD</div>
+					</div>
+					<div class="row">					
+						<div class=cell>conditionB</div>
+						<div class=cell>Name of the second condition</div>
+						<div class=cell>TP_PRAD</div>
+					</div>
+					<div class="row">					
+						<div class=cell>alt_exon_cov_per_base_A</div>
+						<div class=cell>Coverage (per base) for the exon in condition A</div>
+						<div class=cell>57.19</div>
+					</div>
+					<div class="row">					
+						<div class=cell>alt_exon_cov_per_base_B</div>
+						<div class=cell>Coverage (per base) for the exon in condition B</div>
+						<div class=cell>58.67</div>
+					</div>
+					<div class="row">					
+						<div class=cell>alt_exon_cov_per_base_diff</div>
+						<div class=cell>Coverage (per base) difference between conditions</div>
+						<div class=cell>1.48</div>
+					</div>
+					<div class="row">					
+						<div class=cell>abs_ratio_changes</div>
+						<div class=cell>Absolute coverage ratio change.<br>
+						<font style="font-size: 75%">This is calculated by subtracting the coverage ratio of the target exon from the average coverage ratio of all other exons.</font></div>
+						<div class=cell>-0.14</div>
+					</div>
+					<div class="row">					
+						<div class=cell>rel_ratio_changes</div>
+						<div class=cell>Relative coverage ratio change.<br>
+						<font style="font-size: 75%">This is calculated as abs(1 - [coverage ratio of target exon] / [average coverage ratio other exons])</font></div>
+						<div class=cell>0.28</div>
+					</div>
+					<div class="row">					
+						<div class=cell>p.values_ratio</div>
+						<div class=cell>P-value for the change in coverage ratio (uncorrected for multiple testing).</div>
+						<div class=cell>9.30E-10</div>
+					</div>
+					<div class="row">					
+						<div class=cell>incl_jun_start</div>
+						<div class=cell>Start position of the inclusion junction</div>
+						<div class=cell>73744002</div>
+					</div>
+					<div class="row">					
+						<div class=cell>incl_jun_end</div>
+						<div class=cell>End position of the inclusion junction</div>
+						<div class=cell>73745988</div>
+					</div>
+					<div class="row">					
+						<div class=cell>excl_jun_start</div>
+						<div class=cell>Start position of the exlusion junction</div>
+						<div class=cell>73744002</div>
+					</div>
+					<div class="row">					
+						<div class=cell>excl_jun_end</div>
+						<div class=cell>End position of the exclusion junction</div>
+						<div class=cell>73749066</div>
+					</div>
+					<div class="row">					
+						<div class=cell>effect_PSI</div>
+						<div class=cell>Difference in the percent-spliced-in (PSI) score.<br>
+						<font style="font-size: 75%"> The PSI is calculated by dividing the read count of the inclusion junction by the sum of the
+						read counts of the inclusion and exclusion junction for each condition. This value is always an absolute value.</font></div>
+						<div class=cell>0.22</div>
+					</div>
+					<div class="row">					
+						<div class=cell>p.value</div>
+						<div class=cell>P-value of the PSI change (corrected for testing multiple junction combinations).</div>
+						<div class=cell>2.86E-11</div>
+					</div>
+					<div class="row">					
+						<div class=cell>is_significant</div>
+						<div class=cell>Whether or not the PSI p-value passes multiple testing.</div>
+						<div class=cell>TRUE</div>
+					</div>
+					<div class="row">					
+						<div class=cell>uses_novel_junction</div>
+						<div class=cell>Set to TRUE if either junction does not fit the annotated isoforms of this gene.</div>
+						<div class=cell>FALSE</div>
+					</div>
+				</div>
+			</div>
+		</section>
+	</div>
+</body>

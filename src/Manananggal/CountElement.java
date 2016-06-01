@@ -41,7 +41,7 @@ public class CountElement implements Comparable<CountElement>
 			return true;
 		}
 		else
-			return super.equals(o);
+			return false;
 	}
 	
 	// use this function when reading from single counts files

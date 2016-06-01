@@ -1,5 +1,6 @@
+<?link rel="stylesheet" type="text/css" href="/css/mycss.css"?>
 <zk>
-  <window use="Manananggal.SplicingWebApp">
-  <timer id="timerKeepAliveSession" repeats="true" delay="30000"/>
-  </window>
+  	<window use="Manananggal.SplicingWebApp">
+  	<timer id="timerKeepAliveSession" repeats="true" delay="30000"/>
+  	</window>
 </zk>

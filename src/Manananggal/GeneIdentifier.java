@@ -108,6 +108,13 @@ public class GeneIdentifier implements Comparable<GeneIdentifier>
 	@Override
 	public int compareTo(GeneIdentifier other)
 	{
-		return m_strApprovedGeneSymbol.compareTo(other.m_strApprovedGeneSymbol);
+		int nComparison = m_strEnsemblGeneID.compareTo(other.m_strEnsemblGeneID);
+		
+		if(nComparison != 0)
+			return nComparison;
+		
+		nComparison = m_strEnsemblTranscriptID.compareTo(other.m_strEnsemblTranscriptID);
+		
+		return nComparison;
 	}
 }
