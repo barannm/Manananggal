@@ -7,6 +7,10 @@ Compiled program<br>
 <a href=https://github.com/barannm/Manananggal/tree/master/war_files>Web Application</a>(.war file)<br>
 <a href=https://github.com/barannm/Manananggal/tree/master/jar_files>Console Application</a>(.jar file)
 
-If you are unfamilar with the use of .war and .jar files, please review how to deploy .WAR files in the user guide of your server installation (e.g. for a <a href=https://tomcat.apache.org/tomcat-6.0-doc/deployer-howto.html>Apache Tomcat Server</a> and the installation section in the <a href=https://services.bio.ifi.lmu.de/manananggal/Manual/index.html>Manananggal User Manual</a>, which is also available for download <a href=https://github.com/barannm/Manananggal/tree/master/WebContent/Manual>here</a>.
+If you are unfamilar with the use of .war and .jar files, please review how to deploy .WAR files in the user guide of your server installation (e.g. for a <a href=https://tomcat.apache.org/tomcat-6.0-doc/deployer-howto.html>Apache Tomcat Server</a>.
+
+A <a href=https://services.bio.ifi.lmu.de/manananggal>test installation</a> of the tool is available at the Ludwig Maximilian University of Munich.
+
+<b><a href=https://services.bio.ifi.lmu.de/manananggal/Manual/index.html>The Manananggal user manual</a></b> is included in the public test installation and can also be downloaded in its most current form <b><a href=https://github.com/barannm/Manananggal/tree/master/WebContent/Manual>here</a></b>.
 
 For the compilation of the source code several external libraries are required. These libraries include the <a href=https://commons.apache.org/>commons-lang3 and commons-math3</a> libraries (<a href=http://commons.apache.org/proper/commons-daemon/license.html>license</a>), the <a href=http://www.slf4j.org/>Simple Logging Facade for Java (SLF4J)</a> (<a href=http://www.slf4j.org/license.html>license</a>) library, <a href=https://www.broadinstitute.org/igv/igvtools>IGVTools</a> (<a href=https://opensource.org/licenses/lgpl-2.1.php>LGPL license</a>) and the <a href=https://www.zkoss.org/>ZK Community Edition</a> (<a href=https://opensource.org/licenses/lgpl-2.1.php>LGPL license</a>). and can thus be downloaded free of charge. Versions of these libraries used for the tool are included in the WebContent/WEB-INF/lib folder.
