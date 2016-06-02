@@ -120,8 +120,6 @@ import BioKit.Gene;
 import BioKit.RandomAccessGFFReader;
 import BioKit.Utils;
 
-// <?link rel="stylesheet" type="text/css" href="/bootstrap/v3/bootstrap/css/bootstrap.css" ?>
-
 public class SplicingWebApp extends Window
 {		
 	private int				m_nThreads;
