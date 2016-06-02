@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- WARNING: Eclipse auto-generated file.
+              Any modifications will be overwritten.
+              To include a user specific buildfile here, simply create one in the same
+              directory with the processing instruction <?eclipse.ant.import?>
+              as the first entry and export the buildfile again. -->
+<project basedir="." default="build" name="Manananggal">
+    <property environment="env"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.7"/>
+    <property name="source" value="1.7"/>
+    <path id="Web App Libraries.libraryclasspath">
+        <pathelement location="WebContent/WEB-INF/lib/commons-codec.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/commons-fileupload.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/commons-io.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/commons-lang3-3.4-javadoc.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/commons-lang3-3.4.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/commons-math3-3.4.1-javadoc.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/commons-math3-3.4.1.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/idw-gpl.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/jcommon.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/jdom-1.0.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/jfreechart.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/js.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/junit-4.5.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/log4j-1.2.15.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/sam-1.66.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/sapphire.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/silvertail.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/slf4j-api.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/slf4j-jdk14.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zcommon.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zel.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zhtml.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zk.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zkbind.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zkplus.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zul.jar"/>
+        <pathelement location="WebContent/WEB-INF/lib/zweb.jar"/>
+    </path>
+    <path id="EAR Libraries.libraryclasspath"/>
+    <path id="Apache Tomcat v7.0 [Apache Tomcat v7.0].libraryclasspath">
+        <pathelement location="../../apache-tomcat-7.0.59/lib/annotations-api.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/catalina-ant.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/catalina-ha.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/catalina-tribes.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/catalina.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/ecj-4.4.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/el-api.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/jasper-el.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/jasper.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/jsp-api.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/servlet-api.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-api.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-coyote.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-dbcp.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-i18n-es.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-i18n-fr.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-i18n-ja.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-jdbc.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat-util.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/tomcat7-websocket.jar"/>
+        <pathelement location="../../apache-tomcat-7.0.59/lib/websocket-api.jar"/>
+    </path>
+    <path id="Manananggal.classpath">
+        <pathelement location="build/classes"/>
+        <path refid="Web App Libraries.libraryclasspath"/>
+        <path refid="EAR Libraries.libraryclasspath"/>
+        <path refid="Apache Tomcat v7.0 [Apache Tomcat v7.0].libraryclasspath"/>
+    </path>
+    <target name="init">
+        <mkdir dir="build/classes"/>
+        <copy includeemptydirs="false" todir="build/classes">
+            <fileset dir="src">
+                <exclude name="**/*.launch"/>
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+    </target>
+    <target name="clean">
+        <delete dir="build/classes"/>
+    </target>
+    <target depends="clean" name="cleanall"/>
+    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="build-subprojects"/>
+    <target depends="init" name="build-project">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac debug="true" debuglevel="${debuglevel}" destdir="build/classes" includeantruntime="false" source="${source}" target="${target}">
+            <src path="src"/>
+            <classpath refid="Manananggal.classpath"/>
+        </javac>
+    </target>
+    <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
+</project>
