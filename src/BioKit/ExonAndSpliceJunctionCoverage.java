@@ -188,8 +188,6 @@ public class ExonAndSpliceJunctionCoverage
 				Vector<Gene> vcGenes = mapGenes.get(strChrom);
 				Gene g = gtfGene.createGene();
 				
-				//System.out.println(gtfGene.toString());
-				
 				vcGenes.add(g);
 				mapGenes.put(strChrom, vcGenes);
 			}
@@ -286,27 +284,19 @@ public class ExonAndSpliceJunctionCoverage
 		
 		pWriterExons.flush();
 		pWriterExons.close();		
-		pFileWriterExons.flush();
-		pFileWriterExons.close();
 		
 		if(bMultiFileOutput)
 		{
 			pWriterJunctions.flush();
 			pWriterJunctions.close();
-			pFileWriterJunctions.flush();
-			pFileWriterJunctions.close();
 
 			if(bAdditionalFileOutput)
 			{
 				pWriterIntrons.flush();
 				pWriterIntrons.close();
-				pFileWriterIntrons.flush();
-				pFileWriterIntrons.close();
 				
 				pWriterPaired.flush();
 				pWriterPaired.close();
-				pFileWriterPaired.flush();
-				pFileWriterPaired.close();
 			}
 		}
 	}

@@ -205,7 +205,9 @@ public class GTFParser
 		}
 
 		// add cds start and end positions to gene information
-		gene.SetCDSPositions(mapCDSstartToIsoform, mapCDSendToIsoform);
+		if(gene != null)
+			gene.SetCDSPositions(mapCDSstartToIsoform, mapCDSendToIsoform);
+		
 		return gene;
 	}
 	

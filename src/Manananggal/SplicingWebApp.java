@@ -273,6 +273,7 @@ public class SplicingWebApp extends Window
 		boolean			m_bShowScreenshot;	// show just a screenshot instead of the web interface (or create it if necessary)
 		TreeSet<Integer> m_vcSelectedSamples;
 		String			m_strSelectedSamples;
+		int				m_nReferenceID;
 		
 		public Parameters()
 		{
@@ -283,6 +284,7 @@ public class SplicingWebApp extends Window
 			m_bShowScreenshot	= false;
 			m_vcSelectedSamples	= new TreeSet<Integer>();
 			m_strSelectedSamples = null;
+			m_nReferenceID		= -1;
 		}
 	};
 	
@@ -420,7 +422,7 @@ public class SplicingWebApp extends Window
 				String strFileScreenshot = null;
 				if(m_parameters.m_bShowScreenshot)
 				{
-					strFileScreenshot = m_strScreenshotPath + "/" + m_parameters.m_nProjectID + "_" + m_parameters.m_gid.m_strEnsemblGeneID;
+					strFileScreenshot = m_strScreenshotPath + "/" + m_parameters.m_nProjectID + "_" + m_parameters.m_nReferenceID + "_" + m_parameters.m_gid.m_strEnsemblGeneID;
 					if(m_parameters.m_nSelectedIsoforms != 0)
 						strFileScreenshot += "_" + m_parameters.m_nSelectedIsoforms;
 					
@@ -428,7 +430,7 @@ public class SplicingWebApp extends Window
 						strFileScreenshot += "_samples_" + m_parameters.m_strSelectedSamples;
 					
 					strFileScreenshot += ".png";
-					
+
 					File pScreenshot = new File(strFileScreenshot);
 					
 					if(pScreenshot.exists())
@@ -490,6 +492,22 @@ public class SplicingWebApp extends Window
 				{
 					Clients.clearBusy();
 					return;
+				}
+				
+				// select gene annotation file
+				if(m_parameters.m_nReferenceID != -1)
+				{
+					System.out.println("selected reference ID: " + m_parameters.m_nReferenceID);
+					for(Comboitem item : m_comboboxSelectedGeneAnnotation.getItems())
+					{
+						if(item.getValue().hashCode() == m_parameters.m_nReferenceID)
+						{
+							m_comboboxSelectedGeneAnnotation.setSelectedItem(item);
+							m_strFileGTF = item.getValue();
+							LoadGeneAnnotation(m_strFileGTF);
+							break;
+						}
+					}
 				}
 				
 				m_bandboxSelectedGene.setText(m_parameters.m_gid.m_strEnsemblGeneID);
@@ -782,6 +800,13 @@ public class SplicingWebApp extends Window
 		if(m_parameters.m_project == null)
 		{
 			Messagebox.show("Invalid project identifier: " + nID);
+		}
+		
+		// check if gene annotation file exists
+		strParameter = Executions.getCurrent().getParameter("reference");
+		if(strParameter != null)
+		{
+			m_parameters.m_nReferenceID = Integer.parseInt(strParameter);
 		}
 				
 		// check if the gene is valid
@@ -3240,7 +3265,7 @@ public class SplicingWebApp extends Window
 				
 				String strURL = "?";
 				if(nServerPort != 443)
-					strURL = strServer + ":" + nServerPort + strContentsPath + strRequestPath + "?ID=" + nProjectID + "&gene=" + strSelectedGene + "&isoforms=" + nSelectedIsoforms + "&samples=" + strSelectedSamples;
+					strURL = strServer + ":" + nServerPort + strContentsPath + strRequestPath + "?ID=" + nProjectID + "&reference=" + m_strFileGTF.hashCode() + "&gene=" + strSelectedGene + "&isoforms=" + nSelectedIsoforms + "&samples=" + strSelectedSamples;
 				else
 					strURL = strServer + strContentsPath + strRequestPath + "?ID=" + nProjectID + "&gene=" + strSelectedGene + "&isoforms=" + nSelectedIsoforms + "&samples=" + strSelectedSamples;
 //				Messagebox.show(strURL);
@@ -3556,7 +3581,6 @@ public class SplicingWebApp extends Window
 			}
 		}
 	}
-	
 	public void AddComboboxForSamples(Vlayout parentLayout)
 	{		
 		if(m_treeSelectedSamples == null && parentLayout != null)
@@ -3960,7 +3984,6 @@ public class SplicingWebApp extends Window
 
 		UpdateColorSelection();
 	}
-
 	public void AddComboboxesForCondition(Hlayout layoutH)
 	{
 		Vlayout layoutV = new Vlayout();
@@ -4022,7 +4045,7 @@ public class SplicingWebApp extends Window
 			});
 		}
 	}
-	
+
 	public void UpdateComboboxesForCondition()
 	{
 		m_comboboxSelectedCondition.getChildren().clear();

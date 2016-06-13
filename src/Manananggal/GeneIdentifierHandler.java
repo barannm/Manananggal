@@ -245,7 +245,7 @@ public class GeneIdentifierHandler
 		// if no identifier was returned yet, try by gene symbols
 		for(GeneIdentifierRange range : m_vcRangesSymbols)
 		{
-			if(range.m_strFirstString.charAt(0) == gene.getGeneName().charAt(0))
+			if(gene.getGeneName() != null && range.m_strFirstString.charAt(0) == gene.getGeneName().charAt(0))
 			{
 				for(int nIdx : range.m_vcIndices)
 				{
