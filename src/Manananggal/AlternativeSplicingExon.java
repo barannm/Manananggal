@@ -22,6 +22,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+//################################################################################
+//    This class holds the data associated with an alternatively spliced exon.
+//    It includes functions to read and write the data to binary files.
+//################################################################################
 public class AlternativeSplicingExon implements Comparable<AlternativeSplicingExon>
 {
 	protected int	   	m_nType;		// 1 = exon skipping event, 2 = alternative transcript start, 3 = alternative transcript end
@@ -33,7 +37,7 @@ public class AlternativeSplicingExon implements Comparable<AlternativeSplicingEx
 	protected String 	m_strConditionB;
 	
 	protected double 	m_fAltExonCovPerBaseA;	// expression value of the alternatively spliced exon
-	protected double	 m_fAltExonCovPerBaseB;	// expression value of the alternatively spliced exon
+	protected double	m_fAltExonCovPerBaseB;	// expression value of the alternatively spliced exon
 	
 	protected double 	m_fFractionChangeAbsolute;
 	protected double 	m_fFractionChangeRelative;

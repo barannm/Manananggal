@@ -263,30 +263,37 @@ public class ProjectModel implements Comparable<ProjectModel>
 				String strFullPath = pFile.getAbsolutePath();
 				m_strJunctionCountPath = strFullPath.substring(0, strFullPath.lastIndexOf(File.separatorChar));
 			}
-						
+
 			// check if file exists on data load
 			if(bLoadJunctionCounts)
 			{
-				boolean bMergedFilesExist = true;
+				boolean bMergedFileExists = true;
 				// it's sufficient if the merged files exist
-				// use first condition type by default
+				// use first condition type by default				
 				String strConditionType = m_mapConditonsToConditionTypes.firstKey();
 				
-				for(String strCondition : m_mapConditonsToConditionTypes.get(strConditionType))
+				// get condition for current sample
+				TreeMap<String, TreeSet<String>> mapSamplesToCondition = GetSamplesPerCondition(strConditionType);
+				
+				for(String strCondition : mapSamplesToCondition.keySet())
 				{
+					// find the correct condition for the current sample
+					if(!mapSamplesToCondition.get(strCondition).contains(sample.m_strName))
+						continue;
+					
 					// check if the merged and indexed junction count table exists				
 					String strMergedJunctionCountFile = m_strJunctionCountPath + "/" + strCondition + ".merged_junction_counts.dat";
 
 					File pFile = new File(strMergedJunctionCountFile);
 					if(!pFile.exists())
 					{
-						bMergedFilesExist = false;
+						bMergedFileExists = false;
 						break;
 					}
 				}
 				
 				File pFile = new File(sample.m_strJunctionFile);
-				if(!pFile.exists() && !bMergedFilesExist)
+				if(!pFile.exists() && !bMergedFileExists)
 				{
 					try
 					{
@@ -438,11 +445,11 @@ public class ProjectModel implements Comparable<ProjectModel>
 			return;
 		}
 		
-		System.out.println("merging junction counts for " + m_vcSamples.size() + " samples.");
-		
 		// get list of valid samples
 		TreeSet<String> vcValidSamples = new TreeSet<String>();	
 		TreeSet<String> vcSamples = GetSamplesPerCondition(strConditionType).get(strCondition);
+		
+		System.out.println("merging junction counts for " + vcSamples.size() + " samples.");
 		
 		int nIdx = 0;
 		for(Sample sample : m_vcSamples)
@@ -1116,65 +1123,6 @@ public class ProjectModel implements Comparable<ProjectModel>
 		pOutData.close();
 		pOutIdx.close();
 	}
-
-	public TreeSet<AlternativeSplicingHit> LoadHitListOld(String strPath) throws FileNotFoundException
-	{
-		// open input file
-		String strFile = strPath += "/" + m_strProjectName + "_hits.txt";
-		
-		File pFile = new File(strFile);
-		if(!pFile.exists())
-		{
-//			Messagebox.show("File not found: "+ strFile);
-			System.out.println("File not found: "+ strFile);
-			return null;
-		}
-		
-		// parse hits
-		TreeSet<AlternativeSplicingHit> vcHits = new TreeSet<AlternativeSplicingHit>();
-		Scanner pScanner = new Scanner(new File(strFile));
-		while(pScanner.hasNextLine())
-		{
-			String strLine = pScanner.nextLine();
-			
-			AlternativeSplicingHit hit = new AlternativeSplicingHit();
-			hit.ParseString(strLine);
-			
-			vcHits.add(hit);
-		}
-		pScanner.close();
-		
-		return vcHits;
-	}
-	
-	public TreeSet<AlternativeSplicingHit> LoadHitList(String strPath) throws IOException
-	{
-		// open input file
-		String strFile = strPath += "/" + m_strProjectName + "_hits.dat";
-		
-		File pFile = new File(strFile);
-		if(!pFile.exists())
-			return null;
-		
-		TreeSet<AlternativeSplicingHit> vcHits = new TreeSet<AlternativeSplicingHit>();
-		
-		RandomAccessFile pIn = new RandomAccessFile(strFile, "r");
-		while(pIn.getFilePointer() < pIn.length())
-		{
-			AlternativeSplicingHit hit = new AlternativeSplicingHit();
-			if(hit.ReadFromFile(pIn))
-			{
-				vcHits.add(hit);
-			}
-			else
-			{
-				System.out.println("failed to read hit from hit list -> potential file error");
-			}
-		}
-		pIn.close();
-		
-		return vcHits;
-	}
 	
 	public void AddHitToHitList(int nRating, GeneIdentifier gid, int nMinJunctionReads, int nMinCovPerBase, double fMinCoveredBases, double fVariableExonThreshold, TreeSet<String> vcSelectedIsoforms, String strFileGTF, String strComment, String strPath) throws FileNotFoundException
 	{
@@ -1217,28 +1165,6 @@ public class ProjectModel implements Comparable<ProjectModel>
 		
 		File pOut = new File(strFileTmp);
 		pOut.renameTo(pFileIn);
-	}
-	
-	public void SaveHitListToFile(String strPath, TreeSet<AlternativeSplicingHit> vcHits) throws IOException
-	{
-		if(vcHits == null)
-			return;
-		
-		String strFile = strPath + "/" + m_strProjectName + "_hits.dat";
-		File pFile = new File(strFile);
-		
-		if(pFile.exists())
-			pFile.delete();
-		
-		RandomAccessFile pOut = new RandomAccessFile(strFile, "rw");
-//		PrintWriter pOut = new PrintWriter(new FileOutputStream(strFile, true));
-		
-		for(AlternativeSplicingHit hit : vcHits)
-		{
-			hit.WriteToFile(pOut);
-		}
-
-		pOut.close();
 	}
 
 	public void SaveSplicingHitsToFile(String strPath, TreeSet<SimpleSpliceScore> vcHits) throws IOException

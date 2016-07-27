@@ -27,6 +27,10 @@ import org.apache.commons.math3.stat.inference.TTest;
 import BioKit.Exon;
 import BioKit.ExonGroup;
 
+//###########################################################################
+//  This class is used to identify alternatively spliced exon extensions.
+//  The detection is solely based on changes in PSI scores.
+//###########################################################################
 public class AnalyzerExonExtensions
 {
 	public TreeSet<SimpleSpliceScore> IdentifyExonExtensionEvents(SplicingWebApp app, boolean bDebug, TreeSet<SimpleSpliceScore> results) throws IOException

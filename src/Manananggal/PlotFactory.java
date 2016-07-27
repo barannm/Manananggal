@@ -41,6 +41,7 @@ import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Scanner;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Vector;
@@ -358,6 +359,30 @@ public class PlotFactory
 				m_mapColorsToConditions.put(strCondition, new Color(r, g, b));
 			}
 			nCondition+=1;
+		}
+		
+		// overwrite with any colors that might have been saved previously
+		String strIn = model.GetFullPathOfProjectFile() + ".color_scheme";
+		Scanner pIn = null;
+		
+		try
+		{
+			pIn = new Scanner(new File(strIn));
+			
+			while(pIn.hasNextLine())
+			{
+				String strLine = pIn.nextLine();
+				String pSplit[] = strLine.split("\t");
+				
+				Color clr = new Color(Integer.parseInt(pSplit[1]), Integer.parseInt(pSplit[2]), Integer.parseInt(pSplit[3]));
+				m_mapColorsToConditions.put(pSplit[0], clr);
+			}
+			pIn.close();
+		}
+		catch(FileNotFoundException e)
+		{
+			// don't throw an error
+			return;
 		}
 	}
 	
@@ -790,7 +815,7 @@ public class PlotFactory
 					vcExons.add(ex);
 			}
 			
-			// add novel potential novel exons
+			// add potential novel exons
 			int nExonID = 10000;
 			for(CountElement jun : m_vcUnknownJunctions)
 			{
@@ -808,7 +833,7 @@ public class PlotFactory
 	
 			pExonGroups = dataSupplier.RecalculateExonGroups(vcExons);
 		}
-		
+
 		//########################################
 		//      prepare coverage containers
 		//########################################
@@ -3224,10 +3249,12 @@ public class PlotFactory
 		ProjectModel projectModel				= m_app.GetProjectModel();
 		DataSupplier dataSupplier 				= m_app.GetDataSupplier();
 		String strSelectedConditionType 		= m_app.GetSelectedConditionType();
-//		int nMinJunctionReads					= m_app.GetMinimumJunctionReads();
-		Exon pExons[]							= dataSupplier.GetExons();
-		TreeSet<Exon> vcMiddleExons				= dataSupplier.GetMiddleExons();
+		TreeSet<String> vcValidIsoforms 		= m_app.GetValidIsoforms();
 		TreeSet<String> vcSelectedSamples		= m_app.GetSelectedSamples();
+//		int nMinJunctionReads					= m_app.GetMinimumJunctionReads();
+		Exon pExons[]							= dataSupplier.GetExons();		
+		Gene gene 								= dataSupplier.GetGene();
+		TreeSet<Exon> vcMiddleExons				= dataSupplier.GetMiddleExons();		
 		TreeMap<String, TreeSet<String>> mapSamplesToConditions = projectModel.GetSamplesPerCondition(strSelectedConditionType);
 		
 		class Region implements Comparable<Region>
@@ -3238,18 +3265,20 @@ public class PlotFactory
 			double m_fOriginalStart;
 			double m_fOriginalLength;
 			double m_fOffsetY;
-			boolean m_bIsLeftExon;
+			boolean m_bIsLeftTerminalExon;
+			boolean m_bIsRightTerminalExon;
 			boolean m_bIsIncomplete;
 			boolean m_bIsNovel;
 			boolean m_bIsTarget;
 			
-			public Region(double fStart, double fEnd, double fOffsetY, boolean bIsLeftExon, double fOriginalStart, double fOriginalLength)
+			public Region(double fStart, double fEnd, double fOffsetY, boolean bIsLeftTerminalExon, boolean bIsRightTerminalExon, double fOriginalStart, double fOriginalLength)
 			{
 				m_fStart 		= fStart;
 				m_fEnd	 		= fEnd;
 				m_fLength		= fEnd - fStart + 1;
 				m_fOffsetY 		= fOffsetY;
-				m_bIsLeftExon 	= bIsLeftExon;
+				m_bIsLeftTerminalExon  = bIsLeftTerminalExon;
+				m_bIsRightTerminalExon = bIsRightTerminalExon;
 				m_fOriginalLength = fOriginalLength;
 				m_fOriginalStart  = fOriginalStart;
 				m_bIsNovel		= false;
@@ -3261,13 +3290,14 @@ public class PlotFactory
 					m_bIsIncomplete = false;
 			}
 			
-			public Region(double fStart, double fEnd, double fOffsetY, boolean bIsLeftExon, boolean bIsIncomplete)
+			public Region(double fStart, double fEnd, double fOffsetY, boolean bIsLeftTerminalExon, boolean bIsRightTerminalExon, boolean bIsIncomplete)
 			{
 				m_fStart 		= fStart;
 				m_fEnd	 		= fEnd;
 				m_fLength		= fEnd - fStart + 1;
 				m_fOffsetY 		= fOffsetY;
-				m_bIsLeftExon 	= bIsLeftExon;
+				m_bIsLeftTerminalExon  = bIsLeftTerminalExon;
+				m_bIsRightTerminalExon = bIsRightTerminalExon;
 				m_bIsIncomplete	= bIsIncomplete;
 				m_bIsNovel		= false;
 				m_bIsTarget		= false;
@@ -3328,7 +3358,7 @@ public class PlotFactory
 				for(Region ex : vcModifiedExons)
 				{
 					if(ex.overlaps(this))
-					{						
+					{
 						// extend the start of 'this' exons
 						if(m_fStart > ex.m_fStart)
 							m_fStart = Math.max(ex.m_fStart, m_fOriginalStart);
@@ -3350,15 +3380,15 @@ public class PlotFactory
 			
 			public String toString()
 			{
-				return m_fStart + " - " + m_fEnd + "\n - " + m_fOffsetY + "\n - leftExon: " + m_bIsLeftExon + "\n - incompl.:" + m_bIsIncomplete + "\n - novel: " + m_bIsNovel + "\n - target: " + m_bIsTarget + "\n - org. start: " + m_fOriginalStart  + "\n - org. length: " + m_fOriginalLength + "\n";
+				return m_fStart + " - " + m_fEnd + "\n - " + m_fOffsetY + "\n - leftTermExon: " + m_bIsLeftTerminalExon + "\n - rightTermExon: " + m_bIsRightTerminalExon + "\n - incompl.:" + m_bIsIncomplete + "\n - novel: " + m_bIsNovel + "\n - target: " + m_bIsTarget + "\n - org. start: " + m_fOriginalStart  + "\n - org. length: " + m_fOriginalLength + "\n";
 			}
 		};
 		
 		//###################################
 		//       prepare popup window
 		//###################################
-		int nMaxWidth  = (int)(m_nClientWindowWidth*0.5);		
-		int nWindowHeight = (int)(m_nClientWindowHeight*0.5);
+		int nMaxWidth  = (int)(m_nClientWindowWidth*0.7);		
+		int nWindowHeight = (int)(m_nClientWindowHeight*0.7);
 		
 		Window windowPopup = new Window();
 		windowPopup.setParent(m_app);
@@ -3466,34 +3496,25 @@ public class PlotFactory
 				}
 			}
 		}
-
-		boolean bUnknownExonLeftA 	= false;
-		boolean bUnknownExonLeftB 	= false;
-		boolean bUnknownExonRightA 	= false;
-		boolean bUnknownExonRightB 	= false;
 		
 		if(exLeftA == null)
 		{
 			exLeftA = new Exon(nStartA-200, nStartA);
-			bUnknownExonLeftA = true;
 		}
 		
 		if(exLeftB == null)
 		{
 			exLeftB = new Exon(nStartB-200, nStartB);
-			bUnknownExonLeftB = true;
 		}
 		
 		if(exRightA == null)
 		{
 			exRightA = new Exon(nEndA, nEndA+200);
-			bUnknownExonRightA = true;
 		}
 		
 		if(exRightB == null)
 		{
 			exRightB = new Exon(nEndB, nEndB+200);
-			bUnknownExonRightB = true;
 		}
 		
 		//######################################################
@@ -3546,8 +3567,8 @@ public class PlotFactory
 		graph.setColor(Color.white);
 		graph.fillRect(0, 0, nMaxPlotWidth, nMaxHeight);
 		
-		// subtract the margin from the canvas width and reserve some space for the exon names
-		nMaxWidth -= (nMargin*2 + nNameOffset);
+		// subtract the margin from the canvas width and reserve some space for the exon names, also subtract something for the window border and scrollbars, etc.
+		nMaxWidth -= (nMargin*2 + nNameOffset + 100);
 		
 		// reserve some space for the isoform name
 		int nOffsetX = nMargin + nNameOffset;
@@ -3640,285 +3661,218 @@ public class PlotFactory
 		//############################################
 		//    specify regions that should be drawn
 		//############################################
-		
-		// if this result is an exon skipping event, try to add the other half of the splicing cassette
-		CountElement bestSkippingJunctionLeft  = null;
-		CountElement bestSkippingJunctionRight = null;
-		
-		if(result.GetType() == SplicingWebApp.AS_TYPE_EXON_SKIPPING)
+		double fOffsetY = nOffsetY;		
+		int nRegionStart = Math.min(result.GetInclusionJunction().m_nStart, result.GetExclusionJunction().m_nStart);
+		int nRegionEnd   = Math.max(result.GetInclusionJunction().m_nEnd,   result.GetExclusionJunction().m_nEnd);
+
+		TreeSet<Region> vcModifiedExons = new TreeSet<Region>();
+
+		// get the best matching isoforms for the inclusion and exclusion junction
+		for(int i=0; i<2; i++)
 		{
-			TreeSet<CountElement> vcJunctions 			= dataSupplier.GetJunctions();
-			TreeSet<CountElement> vcValidJunctionsLeft 	= new TreeSet<CountElement>();
-			TreeSet<CountElement> vcValidJunctionsRight = new TreeSet<CountElement>();
+			TreeSet<Exon> vcTargetExons = new TreeSet<Exon>();
+			CountElement junTarget = result.GetInclusionJunction();
+			if(i == 1)
+				junTarget = result.GetExclusionJunction();
+
+			// calculate average coverage for all junctions
+			TreeSet<CountElement> vcJunctions = dataSupplier.GetJunctions();
+			TreeMap<CountElement, Double> mapAvgCoverageToJunctions = new TreeMap<CountElement, Double>();
 			
-			// first: find best compatible junction
 			for(CountElement jun : vcJunctions)
 			{
-				if(jun.m_nEnd > result.GetExclusionJunctionStart() && jun.m_nEnd < result.GetInclusionJunctionStart())
-				{
-					vcValidJunctionsLeft.add(jun);
-				}
+				TreeMap<String, Integer> mapCountsToSamples = dataSupplier.GetCountsForJunction(jun);
 				
-				if(jun.m_nStart < result.GetExclusionJunctionEnd() && jun.m_nStart > result.GetInclusionJunctionEnd())
-				{
-					vcValidJunctionsRight.add(jun);
-				}
-			}
-			
-			// find the best matching junction, e.g. the junction that fits best
-			// to the inclusion junctions based on read counts
-			TreeMap<String, Integer> mapCountsToInclusionJunction = dataSupplier.GetCountsForJunction(result.GetInclusionJunction());
-			
-			double fLastMedianDiff = Double.MAX_VALUE;			
-			
-			for(CountElement jun : vcValidJunctionsLeft)
-			{
-				TreeMap<String, Integer> mapCountsToCurrentJunction = dataSupplier.GetCountsForJunction(jun);
-				double pDiff[] = new double[vcSelectedSamples.size()];
-				int nSample = 0;
+				int nCount   = 0;
 				for(String strSample : vcSelectedSamples)
 				{
-					int nCountA = 0;
-					int nCountB = 0;
-					
-					if(mapCountsToInclusionJunction.containsKey(strSample))
-						nCountA = mapCountsToInclusionJunction.get(strSample);
-					
-					if(mapCountsToCurrentJunction.containsKey(strSample))
-						nCountB = mapCountsToCurrentJunction.get(strSample);
-					
-					double fDiff = nCountA - nCountB;
-					pDiff[nSample] = fDiff;
-					
-					nSample++;
+					if(mapCountsToSamples.containsKey(strSample))
+						nCount += mapCountsToSamples.get(strSample);
 				}
 				
-				double fMedianDiff = StatUtils.percentile(pDiff, 50.0);
-				
-				if(fMedianDiff < fLastMedianDiff)
-				{
-					bestSkippingJunctionLeft = jun;
-					fLastMedianDiff = fMedianDiff;
-				}
+				double fAverageCoverage = nCount / vcSelectedSamples.size();
+				mapAvgCoverageToJunctions.put(jun, fAverageCoverage);
 			}
 			
-			fLastMedianDiff = Double.MAX_VALUE;			
-			for(CountElement jun : vcValidJunctionsRight)
+			// find all isoforms that contain the alternative spliced exon
+			TreeSet<String> vcCandidateIsoforms = new TreeSet<String>();
+			for(String strIsoform : vcValidIsoforms)
 			{
-				TreeMap<String, Integer> mapCountsToCurrentJunction = dataSupplier.GetCountsForJunction(jun);
-				double pDiff[] = new double[vcSelectedSamples.size()];
-				int nSample = 0;
-				for(String strSample : vcSelectedSamples)
+				// find all isoforms that include the target junction
+				TreeSet<CountElement> pIsoformJunctions = dataSupplier.GetJunctionsForIsoform(strIsoform);
+				for(CountElement jun : pIsoformJunctions)
 				{
-					int nCountA = 0;
-					int nCountB = 0;
-					
-					if(mapCountsToInclusionJunction.containsKey(strSample))
-						nCountA = mapCountsToInclusionJunction.get(strSample);
-					
-					if(mapCountsToCurrentJunction.containsKey(strSample))
-						nCountB = mapCountsToCurrentJunction.get(strSample);
-					
-					double fDiff = nCountA - nCountB;
-					pDiff[nSample] = fDiff;
-					
-					nSample++;
-				}
-				
-				double fMedianDiff = StatUtils.percentile(pDiff, 50.0);
-				
-				if(fMedianDiff < fLastMedianDiff)
-				{
-					bestSkippingJunctionRight = jun;
-					fLastMedianDiff = fMedianDiff;
-				}
-			}
-		}
-
-		double fOffsetY = nOffsetY;
-		
-		TreeSet<Region> vcModifiedExons = new TreeSet<Region>();
-		int nExonLength 	= -1;
-		int nExStart 		= -1;			
-		int nExEnd	 		= -1;
-		Region modifiedExon	= null;
-		
-		if(bestSkippingJunctionLeft != null)
-		{
-			Exon exon = null;
-
-			// find matching exon
-			for(int i=0; i<2; i++)
-			{
-				if(exon != null)
-					break;
-				
-				for(Exon ex : pExons)
-				{			
-					if(ex.getGenomicStop() == bestSkippingJunctionLeft.m_nStart && (exon == null || (vcMiddleExons.contains(ex) && i==0)))
+					if(jun.GetStart() == junTarget.m_nStart && jun.GetEnd() == junTarget.m_nEnd)
 					{
-						if(exon == null || (exon != null && exon.getGenomicLength() < ex.getGenomicLength()))
-						{
-							exon = ex;
-						}
+						vcCandidateIsoforms.add(strIsoform);
+						break;
 					}
 				}
 			}
+/*			
+			// now find the isoform where the coverage of the junctions fit best to the coverage of the
+			// inclusion/exclusion junction
+			double fAvgTargetJunctionCoverage = mapAvgCoverageToJunctions.get(junTarget);
 			
-			if(exon != null)
+			String strTargetIsoform = "";
+			double fMinDiff = Double.MAX_VALUE;
+			for(String strIsoform : vcCandidateIsoforms)
 			{
-				// add the new left exon for the inclusion path
-				nExonLength 	= Math.min(nMinDrawLength, exon.getGenomicLength());
-				nExStart 		= exon.getGenomicStop() - nExonLength+1;			
-				nExEnd	 		= exon.getGenomicStop();
-				modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, true, exon.getGenomicStart(), exon.getGenomicLength());
-
-				// extend exon length if other exons are overlapping and longer
-				modifiedExon.extendByExons(vcModifiedExons);
-				vcModifiedExons.add(modifiedExon);
-			}
-			else
-			{
-				// add the new left exon for the inclusion path
-				nExonLength 	= nMinDrawLength;
-				nExEnd	 		= bestSkippingJunctionLeft.m_nStart;
-				nExStart 		= nExEnd - nExonLength+1;
-				modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, true, nExStart, nExonLength);
-				modifiedExon.SetIsNovel(true);
-
-				// extend exon length if other exons are overlapping and longer
-				modifiedExon.extendByExons(vcModifiedExons);
-				vcModifiedExons.add(modifiedExon);
-			}
-			
-			// add the middle exon
-			nExStart 		= bestSkippingJunctionLeft.m_nEnd;
-			nExEnd	 		= result.GetInclusionJunctionStart();
-			nExonLength 	= nExEnd - nExStart+1;
-			
-			modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, true, nExStart, nExonLength);
-
-			// extend exon length if other exons are overlapping and longer
-			modifiedExon.extendByExons(vcModifiedExons);
-			vcModifiedExons.add(modifiedExon);
-		}
-		else
-		{
-			
-			nExonLength 	= Math.min(nMinDrawLength, exLeftA.getGenomicLength());
-			nExStart 		= exLeftA.getGenomicStop() - nExonLength+1;			
-			nExEnd	 		= exLeftA.getGenomicStop();
-			modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, true, exLeftA.getGenomicStart(), exLeftA.getGenomicLength());
-			
-			if(bUnknownExonLeftA)
-				modifiedExon.SetIsNovel(true);
-
-			// extend exon length if other exons are overlapping and longer
-			modifiedExon.extendByExons(vcModifiedExons);
-			vcModifiedExons.add(modifiedExon);
-		}
-
-		nExonLength 	= Math.min(nMinDrawLength, exLeftB.getGenomicLength());
-		nExStart 		= exLeftB.getGenomicStop() - nExonLength+1;
-		nExEnd	 		= exLeftB.getGenomicStop();
-		modifiedExon 	= new Region(nExStart, nExEnd, fOffsetY + 40.0, true, exLeftB.getGenomicStart(), exLeftB.getGenomicLength());
-		
-		if(bUnknownExonLeftB)
-			modifiedExon.SetIsNovel(true);
-		
-		// extend exon length if other exons are overlapping and longer
-		modifiedExon.extendByExons(vcModifiedExons);
-		vcModifiedExons.add(modifiedExon);
-		
-		if(bestSkippingJunctionRight != null)
-		{
-			Exon exon = null;
-			
-			// find matching exon
-			for(int i=0; i<2; i++)
-			{
-				if(exon != null)
-					break;
+				TreeSet<CountElement> vcIsoformJunctions = dataSupplier.GetJunctionsForIsoform(strIsoform);
 				
-				for(Exon ex : pExons)
-				{			
-					if(ex.getGenomicStart() == bestSkippingJunctionRight.m_nEnd && (exon == null || (vcMiddleExons.contains(ex) && i==0)))
+				double fDifferenceSum = 0.0;
+				double fJunCount = 0.0;
+				
+				for(CountElement jun : vcIsoformJunctions)
+				{
+					// restrict to junctions in the target region
+					if(jun.m_nStart >= nRegionStart && jun.m_nEnd <= nRegionEnd && !jun.equals(junTarget))
 					{
-						if(exon == null || (exon != null && exon.getGenomicLength() < ex.getGenomicLength()))
-						{
-							exon = ex;
-						}
+						if(mapAvgCoverageToJunctions.containsKey(jun))
+							fDifferenceSum += Math.abs(mapAvgCoverageToJunctions.get(jun) - fAvgTargetJunctionCoverage);
+						else
+							fDifferenceSum += fAvgTargetJunctionCoverage;
+						fJunCount++;
 					}
 				}
+
+				double fDiff = Double.MAX_VALUE;
+				if(i == 1 && fJunCount == 0.0) // allow single junction isoforms for exclusion junctions
+					fDiff = 0;
+				else if(fJunCount != 0.0)
+					fDiff = fDifferenceSum / fJunCount;
+				
+				if(fDiff < fMinDiff)
+				{
+					strTargetIsoform = strIsoform;
+					fMinDiff = fDiff;
+				}
 			}
+*/
+			// use isoform with most exons
+			String strTargetIsoform = "";
+			double fMaxExons = -1;
+			for(String strIsoform : vcCandidateIsoforms)
+			{
+				TreeSet<CountElement> vcIsoformJunctions = dataSupplier.GetJunctionsForIsoform(strIsoform);
+				
+				double fJunCount = 0.0;
+				
+				for(CountElement jun : vcIsoformJunctions)
+				{
+					// restrict to junctions in the target region
+					if(jun.m_nStart >= nRegionStart && jun.m_nEnd <= nRegionEnd && !jun.equals(junTarget))
+					{
+						fJunCount++;
+					}
+				}
+				
+				if(i == 1 && fJunCount == 0.0) // allow single junction isoforms for exclusion junctions
+					fJunCount = 1;
 
-			if(exon != null)
-			{			
-				nExonLength 	= Math.min(nMinDrawLength, exon.getGenomicLength());
-				nExStart 		= exon.getGenomicStart();
-				nExEnd	 		= nExStart + nExonLength-1;
-				modifiedExon 	= new Region(nExStart, nExEnd, fOffsetY, false, exon.getGenomicStart(), exon.getGenomicLength());
-
-				// extend exon length if other exons are overlapping and longer
-				modifiedExon.extendByExons(vcModifiedExons);
-				vcModifiedExons.add(modifiedExon);
+				if(fJunCount > fMaxExons)
+				{
+					fMaxExons = fJunCount;
+					strTargetIsoform = strIsoform;
+				}
+			}
+			
+			if(!strTargetIsoform.isEmpty())
+			{
+				for(Exon ex : gene.getSortedExonsForGeneProduct(strTargetIsoform))
+				{
+					// add all exons within the target region
+					if(ex.getCodingStart() >= nRegionStart && ex.getCodingStop() <= nRegionEnd)
+						vcTargetExons.add(ex);
+					
+					// and add exons that end or start at the border
+					if(ex.getCodingStop() == nRegionStart || ex.getCodingStart() == nRegionEnd)
+						vcTargetExons.add(ex);
+				}
 			}
 			else
 			{
-				// add the new left exon for the inclusion path
-				nExonLength 	= nMinDrawLength;				
-				nExStart 		= bestSkippingJunctionRight.m_nEnd;
-				nExEnd	 		= nExStart + nExonLength-1;
-				modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, true, nExStart, nExonLength);
+				// add novel exon to the left
+				int nExonLength 	= nMinDrawLength;
+				int nExEnd	 		= junTarget.m_nStart;
+				int nExStart 		= nExEnd - nExonLength+1;
+				Region modifiedExon = null; 
+				if(i == 0)
+					modifiedExon = new Region(nExStart, nExEnd, fOffsetY, true, false, nExStart, nExonLength);
+				else
+					modifiedExon = new Region(nExStart, nExEnd, fOffsetY+40, true, false, nExStart, nExonLength);
 				modifiedExon.SetIsNovel(true);
+				modifiedExon.m_bIsIncomplete = true;
+				
+				// extend exon length if other exons are overlapping and longer
+				modifiedExon.extendByExons(vcModifiedExons);				
+				vcModifiedExons.add(modifiedExon);
 
+				// add novel exon to the right
+				nExStart 		= junTarget.m_nEnd;
+				nExEnd	 		= nExStart + nExonLength;				
+
+				// extend exon length if other exons are overlapping and longer
+				if(i == 0)		
+					modifiedExon = new Region(nExStart, nExEnd, fOffsetY, false, true, nExStart, nExonLength);
+				else
+					modifiedExon = new Region(nExStart, nExEnd, fOffsetY+40, false, true, nExStart, nExonLength);					
+				
+				modifiedExon.SetIsNovel(true);
+				modifiedExon.m_bIsIncomplete = true;
+				
 				// extend exon length if other exons are overlapping and longer
 				modifiedExon.extendByExons(vcModifiedExons);
 				vcModifiedExons.add(modifiedExon);
 			}
 			
-			// add the middle exon
-			nExStart 		= result.GetInclusionJunctionEnd();
-			nExEnd	 		= bestSkippingJunctionRight.m_nStart;
-			nExonLength 	= nExEnd - nExStart+1;		
-			
-			modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, true, nExStart, nExonLength);
+			// generate regions
+			int nExonLength 	= -1;
+			int nExStart 		= -1;			
+			int nExEnd	 		= -1;
+			Region modifiedExon	= null;
+					
+			int nCurEx = 0;
+			for(Exon ex : vcTargetExons)
+			{
+				nExonLength 	= ex.getGenomicLength();
+				nExStart 		= ex.getCodingStart();
+				nExEnd	 		= ex.getCodingStop();
+		
+				boolean bIsLeftTerminalExon  = false;
+				boolean bIsRightTerminalExon = false;
+				if(nCurEx == 0)
+				{
+					nExonLength 	= Math.min(nMinDrawLength, ex.getGenomicLength());
+					nExStart 		= ex.getGenomicStop() - nExonLength+1;
+					nExEnd	 		= ex.getGenomicStop();
+					bIsLeftTerminalExon = true;
+				}
+				if(nCurEx == vcTargetExons.size()-1)
+				{
+					nExonLength 	= Math.min(nMinDrawLength, ex.getGenomicLength());
+					nExStart 		= ex.getGenomicStart();		
+					nExEnd	 		= nExStart + nMinDrawLength;
+					bIsRightTerminalExon = true;
+				}
+				
+				if(i == 0)
+					modifiedExon	= new Region(nExStart, nExEnd, fOffsetY, bIsLeftTerminalExon, bIsRightTerminalExon, ex.getGenomicStart(), ex.getGenomicLength());
+				else
+					modifiedExon	= new Region(nExStart, nExEnd, fOffsetY+40, bIsLeftTerminalExon, bIsRightTerminalExon, ex.getGenomicStart(), ex.getGenomicLength());
 
-			// extend exon length if other exons are overlapping and longer
-			modifiedExon.extendByExons(vcModifiedExons);
-			vcModifiedExons.add(modifiedExon);
+				// extend exon length if other exons are overlapping and longer
+				modifiedExon.extendByExons(vcModifiedExons);
+				vcModifiedExons.add(modifiedExon);
+
+				nCurEx++;
+			}
 		}
-		else
-		{
-			nExonLength 	= Math.min(nMinDrawLength, exRightA.getGenomicLength());
-			nExStart 		= exRightA.getGenomicStart();
-			nExEnd	 		= nExStart + nExonLength-1;
-			modifiedExon 	= new Region(nExStart, nExEnd, fOffsetY, false, exRightA.getGenomicStart(), exRightA.getGenomicLength());
-			
-			if(bUnknownExonRightA)
-				modifiedExon.SetIsNovel(true);
-			
-			// extend exon length if other exons are overlapping and longer
-			modifiedExon.extendByExons(vcModifiedExons);
-			vcModifiedExons.add(modifiedExon);
-		}
-		
-		nExonLength 	= Math.min(nMinDrawLength, exRightB.getGenomicLength());
-		nExStart 		= exRightB.getGenomicStart();
-		nExEnd	 		= nExStart + nExonLength-1;
-		modifiedExon 	= new Region(nExStart, nExEnd, fOffsetY + 40.0, false, exRightB.getGenomicStart(), exRightB.getGenomicLength());
-		
-		if(bUnknownExonRightB)
-			modifiedExon.SetIsNovel(true);
-		
-		// extend exon length if other exons are overlapping and longer
-		modifiedExon.extendByExons(vcModifiedExons);
-		vcModifiedExons.add(modifiedExon);
 
 		//############################################################################
 		//                            specify regions
 		//############################################################################
-		// a region is defined as all overlapping exons
+		// a region is defined by all overlapping exons
 		// regions are separated by an intron of undefined length (40% plot width)
 		//############################################################################
 
@@ -3938,18 +3892,10 @@ public class PlotFactory
 			double fRegionStart = 0.0;
 			double fRegionEnd	= 0.0;
 			
-			if(ex.m_bIsLeftExon)
-			{
-				fRegionStart= ex.m_fStart;
-				fRegionEnd	= ex.m_fEnd;
-			}
-			else
-			{
-				fRegionStart= ex.m_fStart;
-				fRegionEnd	= ex.m_fEnd;
-			}
+			fRegionStart= ex.m_fStart;
+			fRegionEnd	= ex.m_fEnd;
 			
-			Region region = new Region(fRegionStart, fRegionEnd, 0.0, false, 0.0, 0.0);
+			Region region = new Region(fRegionStart, fRegionEnd, 0.0, false, false, 0.0, 0.0);
 			
 			boolean bModified = true;
 			
@@ -3964,17 +3910,10 @@ public class PlotFactory
 					if(ex.equals(ex2) || vcTmpUsedExons.contains(ex2))
 						continue;
 					
-					if(ex2.m_bIsLeftExon)
-					{
-						fRegionStart= ex2.m_fStart;
-						fRegionEnd	= ex2.m_fEnd;
-					}
-					else
-					{
-						fRegionStart= ex2.m_fStart;
-						fRegionEnd	= ex2.m_fEnd;
-					}
+					fRegionStart= ex2.m_fStart;
+					fRegionEnd	= ex2.m_fEnd;
 	
+					// cut large terminal exons
 					if(fRegionStart <= region.m_fEnd && fRegionEnd >= region.m_fStart)
 					{
 						region.m_fStart = Math.min(fRegionStart, 	region.m_fStart);
@@ -4003,7 +3942,7 @@ public class PlotFactory
 		double fIntronPixelWidth = (nMaxWidth * 0.4) / (vcRegions.size()-1);
 		
 		// 60% will be used by regions
-		double fRegionPixelWidth = (nMaxWidth * 0.6) / vcRegions.size();
+		double fRegionPixelWidth = (nMaxWidth * 0.6);
 
 		//####################################################
 		//    define pixel positions for regions and exons
@@ -4011,28 +3950,31 @@ public class PlotFactory
 		TreeSet<Region>	vcExonsScreenPositions 	 = new TreeSet<Region>();
 		TreeMap<Region, Region> mapExonBasePositionToExonScreenPosition = new TreeMap<Region, Region>(); 
 		TreeMap<Region, Region>	mapScreenPositionRegionsToBasePositionRegions = new TreeMap<Region, Region>();
-		TreeMap<Region, Double> mapPixelPerBaseToRegions = new TreeMap<Region, Double>();		
-
+		
 		double fScreenStart = nOffsetX;
 		
+		// get a rough estimate of the pixels per base value
+		double fTotalRegionLengthInBp = 0;
 		for(Region region : vcRegions)
 		{
-			double fRegionLength 	= region.m_fLength;
-			double fPixelsPerBase = fRegionPixelWidth / fRegionLength;
-
+			fTotalRegionLengthInBp += region.m_fLength;
+		}
+		double fPixelsPerBase = fRegionPixelWidth / fTotalRegionLengthInBp;
+		
+		// define region screen positions
+		// right now, regions are just exonic, but we want to add some coverage from the introns as well
+		for(Region region : vcRegions)
+		{
 			// extend regions by intronic coverage, keep 20 pixel as spacer
 			// add at most 100 bp!
-			// the first region has downstream intron coverage
 			double fIntronLength = Math.min(100.0, (fIntronPixelWidth*0.4) / fPixelsPerBase);
-			
-			double fScreenEnd = fScreenStart + fRegionPixelWidth;
 
+			// the first region has only downstream intron coverage
 			if(region.m_fStart == fMinBasePosition)
 			{
 				region.m_fEnd += fIntronLength;
-				fScreenEnd += (fIntronPixelWidth*0.4);
 			}
-			// the last region has upstream intron coverage
+			// the last region has only upstream intron coverage
 			else if(region.m_fEnd == fMaxBasePosition)
 			{
 				region.m_fStart -= fIntronLength;
@@ -4041,16 +3983,76 @@ public class PlotFactory
 			else
 			{
 				region.m_fStart -= fIntronLength;
-				region.m_fEnd += fIntronLength;
-				fScreenEnd += (fIntronPixelWidth*0.4);
+				region.m_fEnd   += fIntronLength;
 			}
+		}
+		
+		/*
+		System.out.println("regions before merging:");
+		for(Region reg : vcRegions)
+			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd);
+		*/
+		
+		// merge overlapping regions (basespace)
+		boolean bMerged = true;
+		while(bMerged)
+		{
+			bMerged = false;
 			
-			fRegionLength  = region.m_fEnd - region.m_fStart +1;
-			fPixelsPerBase = (fScreenEnd - fScreenStart+1) / fRegionLength;
+			outer_loop: for(Region region : vcRegions)
+			{
+				for(Region region2 : vcRegions)
+				{
+					// skip if it's the same region
+					if(region.equals(region2))
+						continue;
+					
+					// merge overlapping region
+					if(region.overlaps(region2))
+					{
+						region.m_fStart = region2.m_fStart;
+						region.m_fEnd   = region2.m_fEnd;
+						region.m_bIsLeftTerminalExon  = region.m_bIsLeftTerminalExon  | region2.m_bIsLeftTerminalExon;
+						region.m_bIsRightTerminalExon = region.m_bIsRightTerminalExon | region2.m_bIsRightTerminalExon;
+						region.m_fLength = region.m_fEnd - region.m_fStart +1;
+						vcRegions.remove(region2);
+						bMerged = true;
+						break outer_loop;
+					}
+				}
+			}
+		}
+	
+		/*
+		System.out.println("regions after merging:");
+		for(Region reg : vcRegions)
+			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd);
+		*/
+		
+		// combine length of regions and calculate the number of bases per pixel
+		fTotalRegionLengthInBp = 0;
+		for(Region region : vcRegions)
+		{
+			fTotalRegionLengthInBp += region.m_fLength;
+		}
+		fPixelsPerBase = fRegionPixelWidth / fTotalRegionLengthInBp;
+		
+		// calculate position of regions (screen space)
+		double fScreenStartTmp = fScreenStart;
+		for(Region region : vcRegions)
+		{
+			double fRegionScreenSize = region.m_fLength * fPixelsPerBase;
+			double fScreenEnd = fScreenStartTmp + fRegionScreenSize;
 
-			Region screenPos = new Region(fScreenStart, fScreenEnd, 0.0, false, 0.0, 0.0);
+			Region screenPos = new Region(fScreenStartTmp, fScreenEnd, 0.0, false, false, 0.0, 0.0);
 			mapScreenPositionRegionsToBasePositionRegions.put(region, screenPos);
-			mapPixelPerBaseToRegions.put(region, fPixelsPerBase);
+			
+			fScreenStartTmp += fRegionScreenSize + fIntronPixelWidth;
+		}
+
+		for(Region region : vcRegions)
+		{
+			double fRegionScreenSize = region.m_fLength * fPixelsPerBase;
 			
 			// define start position for each exon in the region
 			for(Region ex : vcModifiedExons)
@@ -4058,7 +4060,7 @@ public class PlotFactory
 				if(region.overlaps(ex))
 				{
 					double fExonStart = Math.min(ex.m_fStart, region.m_fStart);
-					fExonStart = Math.max(fExonStart, ex.m_fOriginalStart);
+					fExonStart = Math.max(fExonStart, ex.m_fOriginalStart);					
 					
 					double fExonEnd = Math.max(ex.m_fEnd, region.m_fEnd);
 					fExonEnd		= Math.min(ex.m_fOriginalStart+ex.m_fOriginalLength-1, fExonEnd);
@@ -4068,8 +4070,8 @@ public class PlotFactory
 					fExonStart = fScreenStart + (fExonStart - region.m_fStart) * fPixelsPerBase;
 					fExonEnd   = fExonStart + fExonWidth*fPixelsPerBase;
 					
-					screenPos = new Region(fExonStart, fExonEnd, ex.m_fOffsetY, ex.m_bIsLeftExon, ex.m_bIsIncomplete);
-					
+					Region screenPos = new Region(fExonStart, fExonEnd, ex.m_fOffsetY, ex.m_bIsLeftTerminalExon, ex.m_bIsRightTerminalExon, ex.m_bIsIncomplete);
+
 					screenPos.SetIsNovel(ex.m_bIsNovel);
 					
 					vcExonsScreenPositions.add(screenPos);
@@ -4077,7 +4079,7 @@ public class PlotFactory
 				}
 			}
 			
-			fScreenStart += fRegionPixelWidth + fIntronPixelWidth;
+			fScreenStart += fRegionScreenSize + fIntronPixelWidth;
 		}
 		
 		//####################################################
@@ -4125,7 +4127,7 @@ public class PlotFactory
 					fIntronEnd = ex.m_fStart-1;
 					nIntronEnd = (int)regionBasePosition.m_fStart;
 					
-					Region intron = new Region(fIntronStart, fIntronEnd, fCurOffset, false, false);
+					Region intron = new Region(fIntronStart, fIntronEnd, fCurOffset, false, false, false);
 					vcIntronScreenPositions.add(intron);
 					
 					if(	(nIntronStart == result.GetInclusionJunctionStart() && nIntronEnd == result.GetInclusionJunctionEnd()) ||
@@ -4146,7 +4148,7 @@ public class PlotFactory
 						}
 					}
 					
-					Region intronBasePosition = new Region(nIntronStart, nIntronEnd, fCurOffset, false, false);
+					Region intronBasePosition = new Region(nIntronStart, nIntronEnd, fCurOffset, false, false, false);
 					mapIntronBasePositionToScreenPosition.put(intron, intronBasePosition);
 					
 					intron.SetIsNovel(bIsNovel);
@@ -4156,6 +4158,19 @@ public class PlotFactory
 				}
 			}
 		}
+		
+		/*
+		System.out.println("BASE Regions: " + mapScreenPositionRegionsToBasePositionRegions.size());
+		for(Region reg : mapScreenPositionRegionsToBasePositionRegions.keySet())
+			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd + " -> " + (int)mapScreenPositionRegionsToBasePositionRegions.get(reg).m_fStart + " " + (int)mapScreenPositionRegionsToBasePositionRegions.get(reg).m_fEnd);
+		System.out.println("BASE position exons:");
+		for(Region reg : mapExonBasePositionToExonScreenPosition.keySet())
+			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd + " -> " + (int)mapExonBasePositionToExonScreenPosition.get(reg).m_fStart + " " + (int)mapExonBasePositionToExonScreenPosition.get(reg).m_fEnd);
+		
+		System.out.println("SCREEN position exons:");
+		for(Region reg : vcExonsScreenPositions)
+			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd);
+		*/
 
 		//######################################################################
 		//                          draw coverage
@@ -4165,10 +4180,10 @@ public class PlotFactory
 		//#################################
 		//    prepare coverage container
 		//#################################		
-		TreeMap<Double, TreeMap<String, double[][]>> mapCoverageToConditionsToRegionStart = new TreeMap<Double, TreeMap<String, double[][]>>();
+		TreeMap<Region, TreeMap<String, double[][]>> mapCoverageToConditionsToRegionStart = new TreeMap<Region, TreeMap<String, double[][]>>();
 		
 		double fYAxisPos = Double.MAX_VALUE;
-				
+
 		for(Region regionBasePosition : mapScreenPositionRegionsToBasePositionRegions.keySet())
 		{
 			int nBasePositionStart 		= (int)regionBasePosition.m_fStart;
@@ -4249,18 +4264,17 @@ public class PlotFactory
 				mapCoverageToConditions.put(strCondition, pCoverage);
 			}
 			
-			mapCoverageToConditionsToRegionStart.put(fScreenPositionStart, mapCoverageToConditions);
+			mapCoverageToConditionsToRegionStart.put(regionBasePosition, mapCoverageToConditions);
 		}
 		
 		// find maximum value
 		double fMaxCoverage = 0.0;
 		for(Region regionBasePosition : mapScreenPositionRegionsToBasePositionRegions.keySet())
 		{
-			double fScreenPositionStart = mapScreenPositionRegionsToBasePositionRegions.get(regionBasePosition).m_fStart;
 			int nBasePositionStart 		= (int)regionBasePosition.m_fStart;
 			int nBasePositionEnd   		= (int)regionBasePosition.m_fEnd;
 			int nBaseLength		  	  	= nBasePositionEnd - nBasePositionStart + 1;
-			TreeMap<String, double[][]> mapCoverageToConditions = mapCoverageToConditionsToRegionStart.get(fScreenPositionStart);
+			TreeMap<String, double[][]> mapCoverageToConditions = mapCoverageToConditionsToRegionStart.get(regionBasePosition);
 			
 			for(String strCondition : mapSamplesToConditions.keySet())
 			{
@@ -4285,14 +4299,11 @@ public class PlotFactory
 			int nBasePositionStart 		= (int)regionBasePosition.m_fStart;
 			int nBasePositionEnd   		= (int)regionBasePosition.m_fEnd;
 			int nBaseLength		  	  	= nBasePositionEnd - nBasePositionStart + 1;
+			double fScreenPositionStart	= mapScreenPositionRegionsToBasePositionRegions.get(regionBasePosition).m_fStart;
 			
-			double fScreenPositionStart = mapScreenPositionRegionsToBasePositionRegions.get(regionBasePosition).m_fStart;
-
-			double fPixelsPerBase = mapPixelPerBaseToRegions.get(regionBasePosition);
+			TreeMap<String, double[][]> mapCoverageToConditions = mapCoverageToConditionsToRegionStart.get(regionBasePosition);
 			
-			TreeMap<String, double[][]> mapCoverageToConditions = mapCoverageToConditionsToRegionStart.get(fScreenPositionStart);
-			
-			// plot
+			// plot coverage
 			for(String strCondition : mapSamplesToConditions.keySet())
 			{
 				if(!vcValidConditions.contains(strCondition))
@@ -4364,7 +4375,7 @@ public class PlotFactory
 		//                           draw exons
 		//######################################################################	
 		for(Region ex : vcExonsScreenPositions)
-		{
+		{			
 			if(ex.m_bIsNovel)
 			{
 				clr = new GradientPaint(0, (int)ex.m_fOffsetY, clrTargetNovelExonTop, 0, (int)ex.m_fOffsetY+20, clrTargetNovelExonBottom);
@@ -4384,12 +4395,12 @@ public class PlotFactory
 			// add marker for shortened exons
 			if(ex.m_bIsIncomplete)
 			{
-				if(ex.m_bIsLeftExon)
+				if(ex.m_bIsLeftTerminalExon)
 				{
 					int nPos = (int)ex.m_fStart - 14;
 					graph.drawImage(imgMarkLeft, nPos, (int)ex.m_fOffsetY-5, null);
 				}
-				else
+				else if(ex.m_bIsRightTerminalExon)
 				{
 					int nPos = (int)ex.m_fEnd - 6;
 					graph.drawImage(imgMarkRight, nPos, (int)ex.m_fOffsetY-5, null);
@@ -4449,6 +4460,8 @@ public class PlotFactory
 			}
 			else
 			{
+				// can't show all junction names
+				/*
 				Font font = new Font("Lucida Sans", Font.PLAIN, 11);
 				graph.setFont(font);
 				FontMetrics metrics = graph.getFontMetrics(font);
@@ -4457,6 +4470,7 @@ public class PlotFactory
 				
 				int nStringWidth = metrics.stringWidth(strJunctionName);
 				graph.drawString(strJunctionName, (int)(intron.m_fStart + intron.m_fLength*0.5 - nStringWidth *0.5), (int)intron.m_fOffsetY+30);
+				*/
 			}
 			
 			

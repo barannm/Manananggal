@@ -27,9 +27,23 @@ import org.apache.commons.math3.stat.inference.TTest;
 import BioKit.Exon;
 import BioKit.ExonGroup;
 
+//#####################################################################
+//    This class is used to identify alternatively spliced terminal
+//    exons. It encompasses two functions, one to identify ATEs by
+//    coverage ratio differences and one to identify ATEs by PSI
+//    changes.
+//#####################################################################
 public class AnalyzerAltStartOrEndEvents
 {
-	public AlternativeSplicingHit IdentifyVariableStartOrEndExons(SplicingWebApp app, AlternativeSplicingHit result) throws IOException
+	//#################################################################
+	//    Identifies alternatively spliced terminal exons based on
+	//    coverage ratio differences.
+	//
+	//    Requires the application object to retrieve the current
+	//    settings and selected isoforms. The identified ATEs will be
+	//    added to the "result" variable
+	//#################################################################
+	public void IdentifyVariableStartOrEndExons(SplicingWebApp app, AlternativeSplicingHit result) throws IOException
 	{	
 		//###################################################################
 		//   retrieve data for the current selections and gene information
@@ -416,10 +430,15 @@ public class AnalyzerAltStartOrEndEvents
 				}
 			}
 		}
-		
-		return result;
 	}
 
+	//#################################################################
+	//    Has a similar purpose to the function above, but identifies
+	//    ATEs based on differences in the PSI score. Because there
+	//    are no "inclusion" and "exclusion" reads for ATEs, it uses
+	//    junction spanning reads referring to the first and second
+	//    start/end exon.
+	//#################################################################
 	public TreeSet<SimpleSpliceScore> CalculateJunctionInclusionScoresForFirstAndLastExons(SplicingWebApp app, boolean bDebug, TreeSet<SimpleSpliceScore> results) throws IOException
 	{	
 		//###################################################################

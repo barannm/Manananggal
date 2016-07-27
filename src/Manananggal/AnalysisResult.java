@@ -26,6 +26,24 @@ import java.util.TreeSet;
 
 import BioKit.Exon;
 
+//################################################################################
+//    This class holds an alternative splicing result, which includes various
+//    information on an alternatively spliced exon.
+//
+//    1. The settings used to generate this result are stored
+//    2. The isoforms that were selected
+//    3. The type of the alternative splicing event, the alternatively
+//    spliced exon as AlternativeSplicingExon object and the PSI result
+//    as SimpleSpliceScore object.
+//
+//    A second AlternativeSplicingExon object might be filled if the event
+//    refers to terminal exons (e.g. two start or end exons show a difference)
+//
+//   The AlternativeSplicingExon objects refer to coverage ratio changes and
+//   the SimpleSpliceScore to a difference in the PSI score.
+//
+//   Functions to read or write the data from/to a binary file are implemented.
+//################################################################################
 public class AnalysisResult implements Comparable<AnalysisResult>
 {
 	private int				m_nRating;
@@ -191,6 +209,11 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		return m_nType;
 	}
 
+	//##################################################################################################
+	//    This function tests whether the alternative splicing event overlaps as region,
+	//    specified by reference name, start and end position.
+	//    Additionally, the type of the alternative splicing event must be specified
+	//##################################################################################################
 	public boolean OverlapsRegion(String strRef, int nStart, int nEnd, int nType)
 	{
 		if(m_nType == nType)
@@ -217,6 +240,14 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		return false;
 	}
 	
+	//##################################################################################################
+	//    This function checks whether any of the result components (coverage ratio change in exon A,
+	//    coverage ratio change in exon B or change in PSI score) refers to a given exon.
+	//    It requires three paramters:
+	//    - The reference name of the query exon (because the BioKit Exon class does not include it)
+	//    - The query exon
+	//    - the type of alternative splicing event
+	//##################################################################################################
 	public boolean IncludesASExon(String strRef, Exon ex, int nType)
 	{
 		int nStart = ex.getCodingStart();

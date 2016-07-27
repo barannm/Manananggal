@@ -24,6 +24,13 @@ import java.util.TreeSet;
 
 import BioKit.Exon;
 
+//################################################################################
+//    The AnalysisResultHandler is used to fill the result list of the web
+//    interface and handles request, such as adding comments or changing the
+//    rating of an alternative splicing event.
+//    It also handles the transfer of temporary results (= results in RAM)
+//    to the permanent (= stored as physical file) result list
+//################################################################################
 public class AnalysisResultHandler
 {
 	private TreeSet<AnalysisResult> 	m_vcResults;			// stores results that were previously saved to disk
@@ -44,6 +51,14 @@ public class AnalysisResultHandler
 		m_nMaxPermanentID		= 0;
 	}
 	
+	//################################################################################
+	//    This function retrieves all alternative splicing events of type "nType"
+	//    that involved an exon, given by reference name and exon object.
+	//
+	//    Currently, this function is only invoked during visualization. It is used
+	//    to identify exons that refer to exon skipping events that will be shown
+	//    by meta exons colored in red.
+	//################################################################################
 	public AnalysisResult GetASResultForExon(String strRef, Exon ex, int nType)
 	{
 		// search temporary results first
@@ -67,6 +82,13 @@ public class AnalysisResultHandler
 		return null;
 	}
 	
+	//################################################################################
+	//    This function retrieves all alternative splicing events of type "nType"
+	//    that overlap a region specified by reference name, start and end position.
+	//
+	//    Currently, this function is only invoked when an highlighted meta exon
+	//    is clicked to show a popup window with information on the AS event
+	//################################################################################
 	public TreeSet<AnalysisResult> GetASResultsForRegion(String strRef, int nStart, int nEnd, int nType)
 	{
 		TreeSet<AnalysisResult> vcRes = new TreeSet<AnalysisResult>();
@@ -92,11 +114,24 @@ public class AnalysisResultHandler
 		return vcRes;
 	}
 	
+	//################################################################################
+	//    Sets the list of alternative splicing events detected for the current
+	//    isoform selection. This function is called when a new gene is analyzed
+	//    or when the isoform selection changed and the "Reanalyze"-Button was clicked.
+	//################################################################################
 	public void AddTemporaryResultsForCurrentlySelectedIsoforms(TreeSet<AnalysisResult> vcResults)
 	{
 		m_vcTemporaryForCurrentSelectedIsoforms = vcResults;
 	}
 	
+	//################################################################################
+	//    Transfers a selection (used defined) of splicing events from the temporary
+	//    result list to the permanent result list. The function is invoked when the
+	//    "Add selection to curated results" Button is clicked.
+	//
+	//    To make changes permanent, an additional click on the "Save Changes" Button
+	//    is required.
+	//################################################################################
 	public void AddCuratedResults(TreeSet<AnalysisResult> vcResults)
 	{
 		for(AnalysisResult res : vcResults)
@@ -108,6 +143,13 @@ public class AnalysisResultHandler
 		}
 	}
 	
+	//################################################################################
+	//    Transfers temporary results from the 'invisible'
+    //    m_vcTemporaryForCurrentSelectedIsoforms list to the 'visible' 
+	//    m_vcTemporaryResults list. During this process, all results get a new ID
+	//    starting with the maximum ID of permanently stored results to avoid any
+	//    duplication.
+	//################################################################################
 	public void UpdateTemporaryResults()
 	{
 		if(m_vcTemporaryForCurrentSelectedIsoforms == null)

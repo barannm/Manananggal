@@ -873,7 +873,7 @@ public class SplicingWebApp extends Window
 	{
 		return m_layoutWest;
 	}
-	
+
 	public Borderlayout GetBorderLayout()
 	{
 		return m_layout;
@@ -2663,6 +2663,13 @@ public class SplicingWebApp extends Window
 		{
 			public void onEvent(Event event) throws Exception
 			{
+			
+				if(m_dataSupplier.GetGene() == null)
+				{
+					Messagebox.show("No gene specified. Please confirm the gene you entered by pressing 'Enter' or select one gene from the list of genes offered while typing.");
+					return;
+				}
+				
 				HideIrrelevantIsoforms(m_bSkipFirstAndLastExon, false);
 				m_plotFactory.RequestCoverageRedraw();
 
@@ -2687,7 +2694,7 @@ public class SplicingWebApp extends Window
 			{
 				if(m_dataSupplier.GetGene() == null)
 				{
-					Messagebox.show("No gene specified");
+					Messagebox.show("No gene specified. Please confirm the gene you entered by pressing 'Enter' or select one gene from the list of genes offered while typing.");
 					return;
 				}
 				
@@ -3289,6 +3296,37 @@ public class SplicingWebApp extends Window
 		m_ColorSelectionGroupBox.setHeight("470px");
 		m_ColorSelectionGroupBox.setContentStyle("overflow:auto;");
 		m_ColorSelectionGroupBox.setMold("3d");
+		
+		Button btn_SaveColorScheme = new Button("Save Color Scheme");
+		btn_SaveColorScheme.setParent(parentLayout);
+		btn_SaveColorScheme.setClass("button green");
+		btn_SaveColorScheme.setStyle("margin-left: 40px");
+		
+		btn_SaveColorScheme.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+		{
+			public void onEvent(Event event) throws Exception
+			{
+				if(m_projectModel == null || !m_projectModel.IsReady())
+					return;
+				
+				String strOut = m_projectModel.GetFullPathOfProjectFile() + ".color_scheme";
+				PrintWriter pOut = new PrintWriter(new File(strOut));
+				
+				TreeMap<String, TreeSet<String>> mapConditionsPerConditionType = m_projectModel.GetConditionsToConditionTypes();
+				for(String strConditionType : mapConditionsPerConditionType.keySet())
+				{
+					for(String strCondition : mapConditionsPerConditionType.get(strConditionType))
+					{
+						Color clr = m_plotFactory.GetColorForCondition(strCondition);
+						pOut.println(strCondition + "\t" + clr.getRed() + "\t" + clr.getGreen() + "\t" + clr.getBlue());
+					}
+				}
+				
+				pOut.close();
+				
+				Messagebox.show("Saved color scheme successfully");
+			}
+		});
 	}
 	
 	public void UpdateColorSelection()

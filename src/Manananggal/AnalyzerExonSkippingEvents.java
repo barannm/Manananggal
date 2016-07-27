@@ -66,7 +66,7 @@ public class AnalyzerExonSkippingEvents
 		//                    prepare result container
 		//###################################################################
 		AlternativeSplicingHit result = null;
-		result = new AlternativeSplicingHit(0, gid, data.GetReferenceName(), nMinJunctionReads, nMinCovPerBase,
+		result = new AlternativeSplicingHit(gid, data.GetReferenceName(), nMinJunctionReads, nMinCovPerBase,
 				fMinCoveredBases, fVariableExonThreshold, vcValidIsoforms, strFileGTF, "");
 
 		//###########################################
