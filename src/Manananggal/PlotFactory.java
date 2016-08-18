@@ -2568,6 +2568,11 @@ public class PlotFactory
 					String strIsoform = evnt.getArea().split("_")[1];	
 					m_app.RemoveIsoformFromSelection(strIsoform);					
 				}
+				else if(evnt.getArea().startsWith("exonic_part"))
+				{
+					m_app.m_plotFactoryGTEX.ShowGTEXDataForExon(evnt.getArea());
+					return;
+				}
 			}
 		});
 	}
