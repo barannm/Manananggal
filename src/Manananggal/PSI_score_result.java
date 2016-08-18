@@ -30,6 +30,10 @@ import org.apache.commons.math3.stat.StatUtils;
 import BioKit.Exon;
 import BioKit.Gene;
 
+/**
+ *    The PSI_score_result includes all data that describes
+ *    an alternative splicing event based on split reads.
+ */
 public class PSI_score_result implements Comparable<PSI_score_result>
 {
 	String 					m_strID;
@@ -38,7 +42,7 @@ public class PSI_score_result implements Comparable<PSI_score_result>
 	double 					m_fPValue;
 	double					m_fMaxEffect;
 	boolean					m_bNovelJunction;
-	BioKit.Exon 					m_pUniqueExonsPathA[];
+	BioKit.Exon 			m_pUniqueExonsPathA[];
 	Exon 					m_pUniqueExonsPathB[];
 	Exon 					m_pSharedExons[];
 	TreeSet<String> 		m_vcValidIsoforms;
@@ -114,6 +118,7 @@ public class PSI_score_result implements Comparable<PSI_score_result>
 		System.out.println(Arrays.toString(m_pSharedExons));
 	}
 	
+	/** Identifies exons and isoforms that are involved in this splicing event */
 	public void ComputeAlternativelySplicedExons(Gene gene)
 	{		
 		int nPathStart	= Integer.MAX_VALUE;
@@ -519,5 +524,4 @@ public class PSI_score_result implements Comparable<PSI_score_result>
 			m_mapScoresToConditions.put(strCondition, pValues);
 		}
 	}
-
 }

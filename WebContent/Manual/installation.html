@@ -4,7 +4,7 @@
 
 <body>
 	<div class="title_div">
-	<h1 class="title blood">Manananggal – Userguide</h1>
+	<h1 class="title">Manananggal – Userguide</h1>
 	
 	<div class=light id="full_size_specificity1">
 			<figure>
@@ -81,6 +81,16 @@
 				</ul>
 			</li>
 			<li><a href="./interpreting_results.html">Interpreting results</a></li>
+			<li><a href="./tutorial.html">Tutorial</a>
+			  <ul>
+			  	<li><a href="./tutorial.html#preamble">Preamble</a></li>
+			  	<li><a href="./tutorial.html#data_selection">Data Loading</a></li>
+				<li><a href="./tutorial.html#isoform_selection">Isoform Choice</a></li>
+				<li><a href="./tutorial.html#result_list">Result List</a></li>
+				<li><a href="./tutorial.html#alt_start">Example 2</a></li>
+				<li><a href="./tutorial.html#exon_extension">Example 3</a></li>
+			  </ul>
+			</li>
 		</ul>
 	</nav>
 	</div>
@@ -169,8 +179,8 @@
 		<section class=mysection>
 		<header><h1>Cross reference file</h1></header>
 		<div class=mydiv>
-			<p>It is more intuitive to search genes by gene symbol than by gene IDs provided by Ensembl, EntrezGene or RefSeq. Therefore it is necessary to tell
-			Manananggal which gene symbol belong to which ID. Because mouse and human gene symbols differ it is necessary to specify one cross-reference for each
+			<p>It is more intuitively to search genes by gene symbol than by gene IDs provided by Ensembl, EntrezGene or RefSeq. Therefore it is necessary to tell
+			Manananggal which gene symbol belongs to which ID. Because mouse and human gene symbols differ it is necessary to specify one cross-reference for each
 			of them. Manananggal automatically searches for a <font style="color: hsl(100,100%,50%)">biomart_cross_ref_human.txt</font> and <font style="color: hsl(100,100%,50%)">
 			biomart_cross_ref_mouse.txt</font> in the reference folder specified in the <font style="color: hsl(100,100%,50%)">app_paths.config</font>.
 			The following table describes the format of the cross-reference file that is used.</p>
@@ -250,8 +260,8 @@
 			<p>write.table(bm, <font style="color: hsl(0, 0%, 70%);">"biomart_cross_ref_human.txt"</font>, row.names=<font style="color: hsl(260, 100%, 50%);">FALSE</font>, quote=<font style="color: hsl(260, 100%, 50%);">FALSE</font>, sep="\t")</p>
 			</div>
 			<p>Alternatively, you can query <a class=text_link href=http://www.genenames.org/cgi-bin/download>genenames.org</a> or <a class=text_link href=http://www.ensembl.org/biomart/martview>biomart</a> in your web browser.
-			Further, Your gene annotation file might include more identifier as is provided by biomart (e.g. if you use Gencode). Therefore you might want to extract the gene_id, transcript_id and gene_symbol attributes
-			from your GTF file and add them manually to the cross reference. Genes without gene symbols can only be querried via Ensembl gene identifier.</p>
+			Further, Your gene annotation file might include more identifiers than provided by biomart (e.g. if you use Gencode). Therefore you might want to extract the gene_id, transcript_id and gene_symbol attributes
+			from your GTF file and add them manually to the cross reference. Genes without gene symbols can only be querried via Ensembl gene identifiers, which should also work for organisms other than mouse and human.</p>
 		</div>
 		
 		</section>
@@ -260,7 +270,7 @@
 		<section class=mysection>
 		  <header><h1>Tissue specific gene expression files [Optional]</h1></header>
 		  <div class=mydiv>
-		  	<p>It might be interesting to know whether the gene (or one of its exons) you are looking has a tissue specific expression. If you have access to such data, Manananggal provides an interface to draw boxplots for the tissue specificity on the gene (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity3&#34;);'>example</a>) and exon (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity2&#34;);'>example</a>) level. Further, tissue specific exon expression can also be indicated on the meta exon track (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity1&#34;);'>example</a>).</p>
+		  	<p>It might be interesting to know whether the gene (or one of its exons) you are looking at has a tissue specific expression. If you have access to such data, Manananggal provides an interface to draw boxplots for the tissue specificity of the gene (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity3&#34;);'>example</a>) and exon (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity2&#34;);'>example</a>) level. Further, tissue specific exon expression can also be indicated on the meta exon track (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity1&#34;);'>example</a>).</p>
 			<p>Currently, tissue specific gene expression must be in the format given below. For each gene there must be one file called <font style="color: hsl(100,100%,50%)">GTEX_[EntrezGeneID].tsv</font>. If multiple tissues are available for the same organ you can denote them as "organ - tissue". Manananggal will group the tissues based on organs but draws one bar per tissue.</p>
 			<div class=table>
 				<div class="row header">

@@ -16,6 +16,12 @@
  */
 package Manananggal;
 
+/**
+ *    The GeneIdentifier class stores various gene IDs for
+ *    a gene that are used for cross referencing. Valid
+ *    gene identifiers are included in the cross reference
+ *    file AND the GTF file.
+ */
 public class GeneIdentifier implements Comparable<GeneIdentifier>
 {
 	String m_strEntrezGeneID;

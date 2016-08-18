@@ -33,6 +33,13 @@ import BioKit.Exon;
 import BioKit.ExonGroup;
 import BioKit.Gene;
 
+/**
+ *    The DataSupplier is a crucial class that provides coverage and junction
+ *    count data to other functions. It is first filled with data on gene
+ *    selection. Changing the isoform selection will also update the data
+ *    stored in the data supplier (e.g. exon groups must be re-calculated if
+ *    the selected isoforms change).
+ */
 public class DataSupplier
 {
 	private Gene												m_Gene;
@@ -153,6 +160,7 @@ public class DataSupplier
 		ProcessGeneStructure();
 	}
 	
+	/** clears all data stored in the data supplier */
 	public void Clear()
 	{
 		m_Gene				= null;
@@ -186,6 +194,11 @@ public class DataSupplier
 		m_vcInvalidConditions = new TreeSet<String>();
 	}
 	
+	/**
+	 *    Maps junctions to isoform names.
+	 *    Used to retrieve all junctions associated
+	 *    with a certain isoform.
+	 */
 	private void MapJunctionsToIsoforms()
 	{
 		for(String strIsoform : m_Gene.getArrayOfGeneProductNames())
@@ -210,6 +223,11 @@ public class DataSupplier
 		}
 	}
 
+	/**
+	 *    Maps exons to isoforms.
+	 *    Used to retrieve all exons that belong
+	 *    to a specific isoform.
+	 */
 	private void MapExonsToIsoforms()
 	{
 		for(String strIsoform : m_Gene.getArrayOfGeneProductNames())
@@ -219,6 +237,12 @@ public class DataSupplier
 		}
 	}
 	
+	/**
+	 *    Identifies annotated exons that are retained introns.
+	 *    Exons that represent retained introns are those exons
+	 *    that overlap with two unjoined exons or that contain
+	 *    a complete splice junction (from start to end).
+	 */
 	private void IdentifyRetainedIntrons()
 	{
 		m_vcRetainedIntrons = new TreeSet<Exon>();
@@ -271,6 +295,13 @@ public class DataSupplier
 		}
 	}
 	
+	/**
+	 *    Processes a gene, which includes retrieving a sorted array
+	 *    of exons, determination of exon groups, mapping of junction
+	 *    counts and exon coverages to isoforms, identification of
+	 *    exons that are retained introns and sub-grouping of exons into
+	 *    terminal exons, middle exons and introns.
+	 */
 	private void ProcessGeneStructure()
 	{
 		//#################################
@@ -329,6 +360,7 @@ public class DataSupplier
 		}
 	}
 
+	/** Returns whether the specified junction is included in the gene annotation */
 	public boolean IsNovelJunction(CountElement jun)
 	{
 		if(m_vcNovelJunctions.contains(jun))
@@ -337,6 +369,7 @@ public class DataSupplier
 			return false;
 	}
 	
+	/** Returns whether the junction is a valid junctions (i.e. has enough coverage)*/
 	public boolean IsInvalidJunction(CountElement jun)
 	{
 		if(m_vcInvalidJunctions.contains(jun))
@@ -345,6 +378,7 @@ public class DataSupplier
 			return false;
 	}
 	
+	/** Returns whether the exon is a retained intron */
 	public boolean IsRetainedIntron(Exon ex)
 	{
 		if(m_vcRetainedIntrons.contains(ex))
@@ -353,6 +387,7 @@ public class DataSupplier
 			return false;
 	}
 	
+	/** Updates the exon groups after isoform selection change */
 	private void UpdateExonGroups(SplicingWebApp app)
 	{
 		//###################################################################
@@ -388,6 +423,15 @@ public class DataSupplier
 		m_pExonGroups		= RecalculateExonGroups(vcAllExons);
 	}
 	
+	/**
+	 *    Class that is used as thread to fill the coverage arrays for the current gene.
+	 *    If the gene is opened for the first time or if samples have been changed, the
+	 *    data supplier retrieves a coverage array for the whole gene. The array is stored
+	 *    if retained introns should be identified (because then intron coverage is needed).
+	 *    The coverage is used to retrieve the coverage for each exon group and, if a gene
+	 *    is loaded for the first time, also to retrieve the coverage of exons and (if required)
+	 *    introns.
+	 */
 	private class ThreadFillCoverageArrays implements Runnable
 	{
 		SplicingWebApp m_app;
@@ -417,7 +461,8 @@ public class DataSupplier
 					try
 					{
 						pCoverage = m_app.GetCoverageForRegion(m_Gene.getChromosome(), m_Gene.getStart(), m_Gene.getStop(), m_strSample, true);
-					} catch (IOException e)
+					}
+					catch (IOException e)
 					{
 						System.out.println("failed to retrieve coverage from bigwig file for sample: " + m_strSample);
 						System.out.println("region: " + m_Gene.getChromosome() + ":" + m_Gene.getStart() + "-" + m_Gene.getStop());
@@ -623,6 +668,28 @@ public class DataSupplier
 		}
 	}
 	
+	/**
+	 *    Invoked from the ThreadFillCoverageArrays class. This function calculate the 
+	 *    'normal' coverage for each exon of a given exon group for a given sample.
+	 *    
+	 *    First 'raw' coverage values are mapped to each exon. Then exons are divided
+	 *    into exons that are indisinguishable from other exons (because they differ only
+	 *    by a few bases, which is insufficient to assign good coverage estimates to both
+	 *    of them) and exons that differ by a sufficient number of bases. The threshold is
+	 *    set to 50 bp.
+	 *    
+	 *    Afterwards coverage is distributed across all exons, with the exception that
+	 *    indistinguishable exons receive the same coverage vale. For the distribution,
+	 *    each position of the exon group is assigned an exon. Each position may only be
+	 *    assigned a single exon and the assignment starts with the highest covered exon.
+	 *    
+	 *    Exon coverages are then recalculated based on the coverage at all positions that
+	 *    were assigned to the exon (representing the unique coverage for each exon).
+	 *    
+	 *    The unique coverage is then used to calculate the 'final'(adjusted) exon coverage
+	 *    that is calculated by subsequently removing the coverage of the exon with the
+	 *    lowest unique coverage from the exon group coverage array.
+	 */
 	private void CalculateNormalExonCoverage(SplicingWebApp app, ExonGroup exonGroup, String strSample)
 	{
 		// get all exons of the target group & get coverage of all of them for the selected sample
@@ -720,7 +787,7 @@ public class DataSupplier
 		
 		//###############################################################################
 		//    Now that we have defined 'unique' coverage regions per exon, we can use
-		//    these regions to calculate the relative exon coverages.
+		//    these regions to calculate the final exon coverages.
 		//###############################################################################
 		TreeMap<Exon, Double> mapFinalExonCoverage = CalculateFinalCoveragePerExon(mapUniqueCoverage, exonGroup.getGenomicStartOfGroup(), pCoverage);
 		
@@ -743,6 +810,7 @@ public class DataSupplier
 		}
 	}
 
+	/** Recalculates the exon groups based on a given set of exon */
 	public ExonGroup[] RecalculateExonGroups(TreeSet<Exon> vcExons)
 	{
 		int nGrpID = 0;
@@ -795,6 +863,11 @@ public class DataSupplier
 		return pExonGroups;
 	}
 	
+	/**
+	 *    Prepares coverage containers and retrieves coverage arrays for
+	 *    all samples from big wig files. Each sample is processed in its
+	 *    own thread.
+	 */
 	private boolean FillCoverageArraysThreaded(SplicingWebApp app)
 	{
 		ProjectModel projectModel = app.GetProjectModel();
@@ -925,7 +998,7 @@ public class DataSupplier
 		return true;
 	}
 	
-	/*
+	/**
 	 * This function identifies conditions that have insufficient coverage
 	 * for all exons of the current gene. These conditions won't be tested
  	 * for alternative splicing (regarding the current gene). 
@@ -988,6 +1061,11 @@ public class DataSupplier
 		}
 	}
 	
+	/**
+	 *    Similar to above, but generates a list of conditions that don't
+	 *    have any usable samples. Requires that IdentifyInvalidConditions()
+	 *    has been invoked first.
+	 */
 	private void IdentifyConditionsWithNoValidSamples(SplicingWebApp app)
 	{
 		ProjectModel projectModel = app.GetProjectModel();
@@ -1019,6 +1097,10 @@ public class DataSupplier
 		}
 	}
 	
+	/**
+	 *    Wrapper function with calls to recalculate the exon groups,
+	 *    retrieve coverage arrays and identify invalid conditions.
+	 */
 	public boolean RetrieveCoverageData(SplicingWebApp app)
 	{
 		// update exon groups for isoform selection
@@ -1033,39 +1115,14 @@ public class DataSupplier
 		// identify conditions that should not be tested due to insufficient gene coverage
 		IdentifyInvalidConditions(app);
 		
-		/*
-		if(true)
-		{
-			System.out.println("first exons: ");
-			for(Exon ex : m_vcFirstExons)
-				System.out.println(ex);
-			
-			System.out.println("last exons: ");
-			for(Exon ex : m_vcLastExons)
-				System.out.println(ex);
-			
-			System.out.println("junction counts: ");
-			for(CountElement e : m_mapJunctionCounts.keySet())
-				System.out.println(e);
-			
-			System.out.println("middle exon groups:");
-			for(ExonGroup grp : m_pMiddleExonGroups)
-			{
-				System.out.println(grp);
-			}
-			
-			System.out.println("all exon groups:");
-			for(ExonGroup grp : m_pExonGroups)
-			{
-				System.out.println(grp);
-			}
-		}
-		*/
-		
 		// success
 		return true;
 	}
 
+	/**
+	 *    Retrieves all junction counts overlapping the current gene locus.
+	 *    Also collects and flags novel junctions, and identifies retained introns.
+	 */
 	public boolean RetrieveJunctionCounts(SplicingWebApp app)
 	{
 		ProjectModel projectModel = app.GetProjectModel();
@@ -1112,7 +1169,7 @@ public class DataSupplier
 		return true;
 	}
 	
-	// identifies lowly covered junctions
+	/** Identifies lowly covered (=invalid) junctions */
 	public void IdentifyInvalidJunctions(SplicingWebApp app, boolean bDebug)
 	{
 		ProjectModel projectModel 			= app.GetProjectModel();
@@ -1175,6 +1232,7 @@ public class DataSupplier
 		}
 	}
 
+	/** Returns the raw coverage for a given exon and sample */
 	double GetRawCoverageForExonAndSample(Exon ex, String strSample)
 	{
 		if(m_mapRawExonCoveragePerSample.containsKey(ex))
@@ -1188,6 +1246,7 @@ public class DataSupplier
 		return 0.0;
 	}
 	
+	/** Retrieves the coverage fraction (number of bases covered of an exon in %) for a given exon and sample */
 	double GetCoverageFractionForExonAndSample(Exon ex, String strSample)
 	{
 		if(m_mapExonCoveredBasesPerSample.containsKey(ex))
@@ -1201,14 +1260,13 @@ public class DataSupplier
 		return 0.0;
 	}
 
+	/** Returns the list of indistinguishable exons */
 	TreeMap<Exon, TreeMap<String, TreeSet<Exon>>> GetIndistinguishableExons()
 	{
 		return m_mapIndistinguishableExonPerSample;
 	}
 	
-	//#################################################################################
-	//    Groups exons of an exon group if they differ by less than nMinUniqueBases
-	//#################################################################################
+	/** Groups exons of an exon group if they differ by less than nMinUniqueBases */
 	public TreeMap<Exon, TreeSet<Exon>> GroupSimilarExons(Vector<Exon> vcExons, int nMinUniqueBases)
 	{
 		TreeMap<Exon, TreeSet<Exon>> mapGroupedExons = new TreeMap<Exon, TreeSet<Exon>>(); 
@@ -1246,9 +1304,7 @@ public class DataSupplier
 		return mapGroupedExons;
 	}
 
-	//####################################################################################################
-	//    Merges all exons with similar expression where one exon is completely contained in the other
-	//####################################################################################################
+	/** Merges all exons with similar expression where one exon is completely contained in the other */
 	public void MergeSimilarExpressedContainedExons(TreeMap<Exon, TreeSet<Exon>> mapGroupedExons, TreeMap<Exon, Double> mapCoveragePerExon)
 	{
 		boolean bMerged = true;
@@ -1298,6 +1354,7 @@ public class DataSupplier
 		}
 	}
 
+	/** Assigns exons to exon positions  */
 	public TreeMap<Integer, TreeSet<Exon>> DefineExonSpecificCoverageRegions(TreeMap<Exon, Double> mapCoverageToExon, int nExonGrpStart)
 	{
 		// track if a base position has been used by a previous exon already
@@ -1362,16 +1419,16 @@ public class DataSupplier
 		return mapCoveragePositions;
 	}
 
-	//###############################################################################
-	//    Calculates the 'unique' coverage per exon. The first parameter is a map
-	//    where each position of the coverage array (last parameter) is assigned
-	//    to exactly one exon. For each exon unambigious exon (key of the grouped
-	//    exon map) the unique coverage is calculated.
-	//
-	//    PLEASE BE AWARE that, in this context, 'unique' coverage may also
-	//    originate from regions that are shared among multiple exons but were
-	//    assigned to a specifc exon due to it's superior overall coverage.
-	//###############################################################################
+	/**
+	 *    Calculates the 'unique' coverage per exon. The first parameter is a map
+	 *    where each position of the coverage array (last parameter) is assigned
+	 *    to exactly one exon. For each exon unambigious exon (key of the grouped
+	 *    exon map) the unique coverage is calculated.
+	 *    
+	 *    PLEASE BE AWARE that, in this context, 'unique' coverage may also
+	 *    originate from regions that are shared among multiple exons but were
+	 *    assigned to a specifc exon due to it's superior overall coverage.
+	*/
 	public TreeMap<Exon, Double> CalculateUniqueCoveragePerExon(TreeMap<Integer, TreeSet<Exon>> mapCoveragePositions, TreeMap<Exon, TreeSet<Exon>> mapGroupedExons, int nExonGrpStart, double[] pCoverage)
 	{
 		// for each exon, calculate the unique coverage
@@ -1447,12 +1504,12 @@ public class DataSupplier
 		return mapUniqueCoverage;
 	}
 	
-	//###################################################################################
-	//    Calculates the final coverage per exon based on the 'unique' exon coverage.
-	//    At first, all exons that have 'unique' coverage are assigned to the respective
-	//    base positions in the coverage array (see above for the definition of 'unique'
-	//    coverage). The coverage array starts with the first base of the exon group.
-	//###################################################################################
+	/**
+	 *    Calculates the final coverage per exon based on the 'unique' exon coverage.
+	 *    At first, all exons that have 'unique' coverage are assigned to the respective
+	 *    base positions in the coverage array (see above for the definition of 'unique'
+	 *    coverage). The coverage array starts with the first base of the exon group.
+	 */
 	public TreeMap<Exon, Double> CalculateFinalCoveragePerExon(TreeMap<Exon, Double> mapUniqueCoverage, int nExonGroupStart, double pCoverage[])
 	{
 		TreeMap<Exon, Double> vcFinalExonCoverage = new TreeMap<Exon, Double>();
@@ -1573,6 +1630,11 @@ public class DataSupplier
 		return vcFinalExonCoverage;
 	}
 	
+	/**
+	 *    Different sets of ambigious (indistinguishable) exons may be created for each sample.
+	 *    This function retrieves the set of ambigious exons that is most frequent across all
+	 *    samples of a condition.
+	 */
 	public TreeMap<String, TreeSet<Exon>> GetMostFrequentSetOfAmbigiousExons(SplicingWebApp app, Exon exon)
 	{
 		//###################################################################
@@ -1666,108 +1728,12 @@ public class DataSupplier
 		return mapAmbigiousExonsPerCondition;
 	}
 
-	/*
-	public TreeMap<String, Double> CalculateRelativeExonExpressionPerSample(SplicingWebApp app, Exon exon, ExonGroup exonGroup)
-	{	
-		//###################################################################
-		//   retrieve data for the current selections and gene information
-		//###################################################################
-		String strSelectedConditionType 	= app.GetSelectedConditionType();
-		TreeSet<String> vcSelectedSamples 	= app.GetSelectedSamples();
-		ProjectModel projectModel 			= app.GetProjectModel();
-		//###################################################################
-		
-		TreeMap<String, TreeSet<String>> vcSamplesPerCondition = projectModel.GetSamplesPerCondition(strSelectedConditionType);
-		TreeMap<String, Double> mapRelativeExonCoveragePerSample = new TreeMap<String, Double>();
-		
-		// Get a majority vote on how to calculate the relative expression of this exon
-		// The most frequent exon separation will be used
-		TreeMap<String, Exon> mapTargetExonsPerSample = new TreeMap<String, Exon>();
-		
-		TreeMap<String, TreeSet<Exon>> vcAmbigiousExonSetsPerCondition = GetMostFrequentSetOfAmbigiousExons(app, exon);
-		
-		for(String strCondition : vcSamplesPerCondition.keySet())
-		{		
-			TreeSet<Exon> vcTarget = vcAmbigiousExonSetsPerCondition.get(strCondition);
-			
-			// get the target exon per sample
-			for(String strSample : vcSamplesPerCondition.get(strCondition))
-			{				
-				for(Exon tarEx : m_mapIndistinguishableExonPerSample.keySet())
-				{
-					if(m_mapIndistinguishableExonPerSample.get(tarEx).containsKey(strSample))
-					{
-						TreeSet<Exon> vcExons = m_mapIndistinguishableExonPerSample.get(tarEx).get(strSample);
-						
-						boolean bIsSame = true;
-						if(vcTarget.size() != vcExons.size())
-							bIsSame = false;
-						
-						for(Exon ex : vcExons)
-						{
-							if(!vcTarget.contains(ex))
-								bIsSame = false;
-						}
-						
-						if(bIsSame)
-							mapTargetExonsPerSample.put(strSample, tarEx);
-					}
-				}
-			}
-		}
-	
-		for(String strCondition : vcSamplesPerCondition.keySet())
-		{
-			for(String strSample : vcSamplesPerCondition.get(strCondition))
-			{
-				if(!mapTargetExonsPerSample.containsKey(strSample))
-					continue;
-				
-				Exon targetExon = mapTargetExonsPerSample.get(strSample);
-				
-				if(vcSamplesPerCondition.get(strCondition).contains(strSample))
-				{
-					if(m_mapFinalExonCoveragePerSample.containsKey(targetExon))
-					{
-						double fMaxCoverage = 0.0;
-						double fTotalCoverage = 0.0;
-						
-						// get total coverage for the current exon group
-						for(Exon ex : exonGroup.getExons())
-						{
-							if(m_mapFinalExonCoveragePerSample.containsKey(ex))
-							{
-								fTotalCoverage += m_mapFinalExonCoveragePerSample.get(ex).get(strSample);
-								fMaxCoverage = Math.max(fMaxCoverage, m_mapFinalExonCoveragePerSample.get(ex).get(strSample));
-							}
-						}
-		
-						if(fTotalCoverage > 0)
-						{
-							double fCoverage = 0.0;
-							if(m_bUseRelativeExonCoverageMode1)
-							{
-								fCoverage = m_mapExonCoveragePerSample.get(targetExon).get(strSample) / fTotalCoverage * 100.0;
-							}
-							else if(m_bUseRelativeExonCoverageMode2)
-							{
-								fCoverage = m_mapExonCoveragePerSample.get(targetExon).get(strSample) / fMaxCoverage * 100.0;
-							}
-							mapRelativeExonCoveragePerSample.put(strSample, fCoverage);
-						}
-						else
-						{
-							mapRelativeExonCoveragePerSample.put(strSample, 0.0);
-						}
-					}
-				}
-			}
-		}
-
-		return mapRelativeExonCoveragePerSample;
-	}
-	*/
-	
+	/**
+	 *    Returns a exon coverage values for each sample fir a specified exon.
+	 *    The function first calls GetMostFrequentSetOfAmbigiousExons() to identify
+	 *    which exons it must query and then returns the respective 'final' (adjusted)
+	 *    coverage value.
+	 */
 	public TreeMap<String, Double> GetAbsoluteCoveragePerSample(SplicingWebApp app, Exon exon)
 	{
 		//###################################################################
@@ -1781,7 +1747,7 @@ public class DataSupplier
 		TreeMap<String, TreeSet<String>> vcSamplesPerCondition = projectModel.GetSamplesPerCondition(strSelectedConditionType);
 		TreeMap<String, Double> mapAbsoluteExonCoveragePerSample = new TreeMap<String, Double>();
 		
-		// Get a majority vote on how to calculate the (relative) expression of this exon
+		// Get a majority vote on how to calculate the expression of this exon
 		// The most frequent exon separation will be used
 		TreeMap<String, Exon> mapTargetExonsPerSample = new TreeMap<String, Exon>();
 		
@@ -1848,21 +1814,25 @@ public class DataSupplier
 		return mapAbsoluteExonCoveragePerSample;
 	}
 
+	/** Returns an array with all exons of the gene */
 	public Exon[] GetExons()
 	{
 		return m_pExons;
 	}
 	
+	/** Returns an array with all exon groups of the gene */
 	public ExonGroup[] GetExonGroups()
 	{
 		return m_pExonGroups;
 	}
 	
+	/** Returns an array of all 'middle' (non-terminal) exon groups */
 	public ExonGroup[] GetMiddleExonGroups()
 	{
 		return m_pMiddleExonGroups;
 	}
 	
+	/** Returns a list of all splice junctions of the gene */
 	public TreeSet<CountElement> GetJunctions()
 	{
 		TreeSet<CountElement> vcJunctions = new TreeSet<CountElement>();
@@ -1872,11 +1842,13 @@ public class DataSupplier
 		return vcJunctions;
 	}
 	
+	/** Returns a list of all junctions for a specific isoform */
 	public TreeSet<CountElement> GetJunctionsForIsoform(String strIsoform)
 	{
 		return m_mapJunctionsToIsoforms.get(strIsoform);
 	}
 	
+	/** Returns the coverage counts for a specific junction */
 	public TreeMap<String, Integer> GetCountsForJunction(CountElement jun)
 	{
 		if(m_mapJunctionCounts.containsKey(jun))
@@ -1885,6 +1857,10 @@ public class DataSupplier
 		return null;
 	}
 	
+	/** 
+	 *    Returns the coverage counts for a junction that is specified
+	 *    by start and end position
+	 */
 	public TreeMap<String, Integer> GetCountsForJunction(int nStart, int nEnd)
 	{
 		for(CountElement jun : m_mapJunctionCounts.keySet())
@@ -1897,72 +1873,86 @@ public class DataSupplier
 		
 		return null;
 	}
-	
+
+	/** Returns an array of exons for the specified isoform */
 	public Exon[] GetExonsForIsoform(String strIsoform)
 	{
 		return m_mapExonsToIsoforms.get(strIsoform);
 	}
 	 
+	/** Returns an array with all isoform names */
 	public String[] GetIsoformNames()
 	{
 		return m_Gene.getArrayOfGeneProductNames();
 	}
 	
+	/** Returns a list with all first (start) exons */
 	public TreeSet<Exon> GetAllFirstExons()
 	{
 		return m_vcFirstExons;
 	}
 	
+	/** Returns a list with all last (end) exons */
 	public TreeSet<Exon> GetAllLastExons()
 	{
 		return m_vcLastExons;
 	}
 	
+	/** Returns a list of all middle (non-terminal) exons */
 	public TreeSet<Exon> GetMiddleExons()
 	{
 		return m_vcMiddleExons;
 	}
 	
+	/** Returns a list of all introns */
 	public TreeSet<Exon> GetIntrons()
 	{
 		return m_vcIntrons;
 	}
 	
+	/** Returns the gene's strand */
 	public char GetStrand()
 	{
 		return m_Gene.getStrandStringID();
 	}
 	
+	/** Returns the name of the reference on which the gene is located*/
 	public String GetReferenceName()
 	{
 		return m_Gene.getChromosome();
 	}
 	
+	/** Returns the gene ID*/
 	public String GetGeneID()
 	{
 		return m_Gene.getGeneID();
 	}
 	
+	/** Returns the gene name (symbol) */
 	public String GetGeneName()
 	{
 		return m_Gene.getGeneName();
 	}
 	
+	/** Returns a list of all unique exons */
 	public TreeSet<Exon> GetUniqueExons(TreeSet<String> vcIsoformsToConsider)
 	{
 		return m_Gene.getUniqueExons(vcIsoformsToConsider);
 	}
 	
+	/** Returns a list of all unique junctions */
 	public TreeSet<String> GetUniqueJunctions(TreeSet<String> vcIsoformsToConsider)
 	{
 		return m_Gene.getUniqueJunctions(vcIsoformsToConsider);
 	}
 	
+	/** Returns the gene */
 	public Gene GetGene()
 	{
 		return m_Gene;
 	}
 	
+	/** Retrieves the coverage array for the whole gene for the specified sample */
 	public double[] GetGeneCoverageArrayForSample(String strSample)
 	{
 		if(m_mapGeneCoveragePerSample.containsKey(strSample))
@@ -1971,6 +1961,7 @@ public class DataSupplier
 			return null;
 	}
 	
+	/** Retrieves the coverage array for a specific exon group for the specified sample */
 	public double[] GetCoverageArrayForExonGroupAndSample(SplicingWebApp app, ExonGroup grp, String strSample)
 	{		
 		if(m_mapCoverageToExonGroupsPerSample.containsKey(grp))
@@ -2023,6 +2014,7 @@ public class DataSupplier
 		return pGrpCoverage;
 	}
 	
+	/** Retrieves the coverage array for a specific 'middle' exon group for the specified sample */
 	public double[] GetCoverageArrayForMiddleExonGroupAndSample(ExonGroup grp, String strSample)
 	{		
 		if(m_mapCoverageToMiddleExonGroupsPerSample.containsKey(grp))
@@ -2036,6 +2028,7 @@ public class DataSupplier
 		return null;
 	}
 	
+	/** Retrieves the coverage array for a specific exon for the specified sample */
 	public double[] GetCoverageArrayForExonAndSample(Exon ex, String strSample)
 	{
 		if(m_mapCoverageToExonsPerSample.containsKey(ex))
@@ -2049,6 +2042,7 @@ public class DataSupplier
 		return null;
 	}
 	
+	/** Retrieves the coverage array for a specific intron for the specified sample */
 	public double[] GetCoverageArrayForIntronAndSample(Exon intron, String strSample)
 	{
 		if(m_mapCoverageToIntronsPerSample.containsKey(intron))
@@ -2062,40 +2056,39 @@ public class DataSupplier
 		return null;
 	}
 	
-	public double[] GetCoverageArrayForGeneAndSample(String strSample)
-	{
-		return m_mapGeneCoveragePerSample.get(strSample);
-	}
-	
+	/** Returns the gene start position */
 	public int GetGeneStart()
 	{
 		return m_Gene.getStart();
 	}
 
+	/** Returns the gene end position */
 	public int GetGeneEnd()
 	{
 		return m_Gene.getStop();
 	}
 
+	/** Returns the gene identifier associated with the gene */
 	public GeneIdentifier GetGeneIdentifier()
 	{
 		return m_GID;
 	}
 	
+	/** Returns the list of conditions with insufficient coverage */
 	public TreeSet<String> GetInvalidConditions()
 	{
 		return m_vcInvalidConditions;
 	}
-	
-	public void SetExonGroups()
-	{
-	}
-	
-	public void SetGeneName(String strGeneName)
-	{
-		m_Gene.setGeneName(strGeneName);
-	}
 
+	/**
+	 *    Calculates and returns junction coverage ratios for two conditions.
+	 *    Ratios are calculated for each sample and stored in a two-dimensional
+	 *    result array, where each dimension corresponds to a different condition.
+	 *     
+	 *    If the project includes paired-samples the function makes sure to
+	 *    add the ratios for both conditions in the same order. This is required
+	 *    for the paired t-test that follows.
+	 */
 	public double[][] RetrieveJunctionRatios(SplicingWebApp app, String strConditionA, String strConditionB, CountElement jun1, CountElement jun2)
 	{
 		String strConditionType = app.GetSelectedConditionType();
@@ -2230,11 +2223,13 @@ public class DataSupplier
 		return pRes;
 	}
 
+	/** Returns the start position of the coding region for a specified isoform */
 	public int GetCodingStartForIsoform(String strIsoform)
 	{
 		return m_Gene.GetCodingStartForIsoform(strIsoform);
 	}
 	
+	/** Returns the end position of the coding region for a specified isoform */
 	public int GetCodingEndForIsoform(String strIsoform)
 	{
 		return m_Gene.GetCodingEndForIsoform(strIsoform); 

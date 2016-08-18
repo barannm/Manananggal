@@ -20,6 +20,7 @@ import java.io.IOException;
 
 import org.broad.igv.bbfile.BBFileReader;
 
+/** wrapper class for the bigwig reader */
 public class BigWigReader extends BBFileReader
 {
 	public BigWigReader(String path) throws IOException
@@ -29,7 +30,7 @@ public class BigWigReader extends BBFileReader
 	
 	public void close() throws IOException
 	{
+		// close the input stream on close()
 		getBBFis().close();
 	}
-
 }

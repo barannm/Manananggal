@@ -459,21 +459,23 @@ div.mydiv
 .my_counter li
 {
     counter-increment: item;
+    
+    text-indent: -1.5em;
+    margin-left: 1.5em;
 }
 
 .my_counter li:before
 {
-	content: counter(item);
-    margin-right: 5px;
-    font-size: 80%;
-    background-color: hsl(240, 100%, 20%);
-    color: white;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 3px;
-	
-	text-align: left;
-	text-shadow: none;
+	content:            counter(item);
+    margin-right:       5px;
+    font-size:          80%;
+    background-color:   hsl(240, 100%, 20%);
+    color:              white;
+    font-weight:        600;
+    padding:            3px 8px;
+    border-radius:      3px;
+	text-align:         left;
+	text-shadow:        none;
 }
 
 .inner_img_wrapper
@@ -521,7 +523,17 @@ img
 	display: 	block;
 	position:	relative;
 	z-index:	1;
-	width: 		100%;
+	max-width: 	100%;
+}
+
+img.icon
+{
+	border:		0;
+	display: 	inline;
+	position:	relative;
+	height:    23px;
+	width:     23px;
+	top:       4px;
 }
 
 map.area

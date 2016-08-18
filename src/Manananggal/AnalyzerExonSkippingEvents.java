@@ -27,6 +27,11 @@ import org.apache.commons.math3.stat.inference.TTest;
 import BioKit.Exon;
 import BioKit.ExonGroup;
 
+/**
+ *    This class includes two functions to identify exon skipping events.
+ *    The first funciton tries to identify changes in the coverage ratio
+ *    and the second function tries to find differences in the PSI scores.
+ */
 public class AnalyzerExonSkippingEvents
 {
 	public AlternativeSplicingHit IdentifyVariableExons(SplicingWebApp app, boolean bIgnoreFirstAndLastExons) throws IOException
@@ -481,7 +486,7 @@ public class AnalyzerExonSkippingEvents
 								if(fPValue <= 0.05)
 								{
 									SimpleSpliceScore res = new SimpleSpliceScore(data.GetGeneID(), junIncl, junExcl, fPValue, fIncLevel, strConditionA, strConditionB, SplicingWebApp.AS_TYPE_EXON_SKIPPING);
-									res.GetValidIsoforms(data.GetGene());
+									res.CheckIfNovel(data.GetGene());
 									vcSpliceScores.add(res);
 								}
 							}

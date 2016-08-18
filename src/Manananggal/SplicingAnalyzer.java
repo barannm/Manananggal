@@ -31,6 +31,15 @@ import BioKit.ExonAndSpliceJunctionCoverage;
 import BioKit.Gene;
 import BioKit.RandomAccessGFFReader;
 
+/**
+ *    The SplicingAnalyzer class is the main class of the console application.
+ *    Depending on input parameters it:
+ *    - starts the identification of alternative splicing events for all genes
+ *      in the GTF file,
+ *    - merges plain text count files into one large binary file,
+ *    - calculates size factors,
+ *    - or calculates the inclusion rates of specific exons in the data set.
+ */
 public class SplicingAnalyzer
 {
 	static SplicingWebApp app;
@@ -117,6 +126,11 @@ public class SplicingAnalyzer
 		}
 	}
 	
+	/**
+	 *    Creates a table with the inclusion rates for a list of exons for each sample in the project.
+	 *    The inclusion rates are calculated by comparing the coverage of 'constant' (non-target) exons
+	 *    to the exon given in the exon list.
+	 */
 	public static void CalculateSingleSampleExonInclusionRate(String strProject, String strFileExons, String strFileGTF) throws Exception
 	{
 		ProjectModel project = new ProjectModel();
@@ -270,6 +284,8 @@ public class SplicingAnalyzer
 				fConstantCoverage /= nConstantValues;
 				
 				double fInclusionRate = -1.0;
+				
+				// constant exon expression should be at least 10x
 				if(fConstantCoverage > 10)
 					fInclusionRate = fAltExonCoverage / fConstantCoverage;
 				
@@ -288,135 +304,4 @@ public class SplicingAnalyzer
 		pOut.close();
 	}
 
-	public static void CalculateSingleSampleExonInclusionRate2(String strProject, String strFileExons) throws IOException
-	{
-		ProjectModel project = new ProjectModel();
-		project.Init(strProject, -1, -1, -1, -1, false);
-		
-		TreeMap<String, String> mapBigWigFiles = project.GetBigWigFilesForSamples();
-		
-		Scanner pIn = new Scanner(new File(strFileExons));
-		PrintWriter pOut = new PrintWriter(new File("sample_inclusion_rates.tsv"));
-		
-		pOut.write("#gene\tchrom\tstart\tend");
-		for(String strSample : project.GetSamples())
-			pOut.write("\t" + strSample);
-		pOut.write("\n");
-
-		while(pIn.hasNextLine())
-		{
-			String strLine = pIn.nextLine();
-			
-			// skip header
-			if(strLine.startsWith("#"))
-				continue;
-			
-			String pSplit[] = strLine.split("\t");
-			
-			String strGene	= pSplit[0];
-			String strRef	= pSplit[1];
-			int nExStart	= Integer.parseInt(pSplit[2]);
-			int nExEnd		= Integer.parseInt(pSplit[3]);
-			int nUpStreamStart		= Integer.parseInt(pSplit[4]);
-			int nUpStreamEnd		= Integer.parseInt(pSplit[5]);
-			int nDownStreamStart	= Integer.parseInt(pSplit[6]);
-			int nDownStreamEnd		= Integer.parseInt(pSplit[7]);
-			
-			pOut.write(strGene + "\t" + strRef + "\t" + nExStart + "\t" + nExEnd);
-			
-			System.out.println("processing: " + strGene + "\t" + strRef + "\t" + nExStart + "\t" + nExEnd + "\t" + nUpStreamStart + "-" + nDownStreamEnd);
-			
-			// get coverage for up to 100 bases of the upstream and downstream exon
-			// and the alternatively spliced exon for each sample
-			for(String strSample : project.GetSamples())
-			{
-				// open bigwig file
-				String strFile = mapBigWigFiles.get(strSample);
-				
-				BigWigReader reader = null;
-				
-				try
-				{
-					reader = new BigWigReader(strFile);
-				}
-				catch(IOException ex)
-				{
-					System.out.println(ex.getMessage());
-					pIn.close();
-					pOut.close();
-					return;
-				}
-
-				BigWigIterator it = reader.getBigWigIterator(strRef, nUpStreamStart, strRef, nDownStreamEnd, false);
-
-				// fill array with values
-				int pValues[] = new int[nDownStreamEnd-nUpStreamStart+1];
-				while(it.hasNext())
-				{
-					WigItem item = it.next();
-					int nIdx = item.getEndBase() - nUpStreamStart;						
-					int nValue = (int)item.getWigValue();
-					
-					pValues[nIdx] = nValue;
-				}
-				
-				double fUpStreamCoverage 	= 0.0;
-				double fDownStreamCoverage 	= 0.0;
-				double fExonCoverage 		= 0.0;
-				
-				// get upstream coverage			
-				int nUpstreamLength = nUpStreamEnd - nUpStreamStart +1;
-				if(nUpstreamLength > 100)
-				{
-					for(int i=nUpStreamEnd-100; i<nUpStreamEnd; i++)
-						fUpStreamCoverage += pValues[i - nUpStreamStart];
-					
-					fUpStreamCoverage /= 100.0;
-				}
-				else
-				{
-					for(int i=nUpStreamStart-1; i<nUpStreamEnd; i++)
-						fUpStreamCoverage += pValues[i - nUpStreamStart];
-					
-					fUpStreamCoverage /= nUpstreamLength;
-				}
-				
-				// get downstream coverage			
-				int nDownstreamLength = nDownStreamEnd - nDownStreamStart +1;
-				if(nDownstreamLength > 100)
-				{					
-					for(int i=nDownStreamStart-1; i<nDownStreamStart+100; i++)
-						fDownStreamCoverage += pValues[i - nUpStreamStart];
-					
-					fDownStreamCoverage /= 100.0;
-				}
-				else
-				{
-					for(int i=nDownStreamStart-1; i<nDownStreamEnd; i++)
-						fDownStreamCoverage += pValues[i - nUpStreamStart];
-					
-					fDownStreamCoverage /= nDownstreamLength;
-				}
-				
-				// get exon coverage
-				for(int i=nExStart-1; i<nExEnd; i++)
-					fExonCoverage += pValues[i - nUpStreamStart];
-				
-				fExonCoverage /= (nExEnd - nExStart + 1);
-				
-				double fInclusionRate = -1.0;
-				if((fUpStreamCoverage + fDownStreamCoverage)*0.5 > 20)
-					fInclusionRate = fExonCoverage / ((fUpStreamCoverage + fDownStreamCoverage)*0.5);
-				
-				pOut.write("\t" + fInclusionRate);
-			}
-			
-			pOut.write("\n");
-		}
-
-		pIn.close();
-		
-		pOut.flush();
-		pOut.close();
-	}
 }

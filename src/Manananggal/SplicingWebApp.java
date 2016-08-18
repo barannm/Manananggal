@@ -109,7 +109,6 @@ import org.zkoss.zul.Treecols;
 import org.zkoss.zul.Treeitem;
 import org.zkoss.zul.Treerow;
 import org.zkoss.zul.Vlayout;
-import org.zkoss.zul.West;
 import org.zkoss.zul.Window;
 
 import BioKit.Exon;
@@ -120,8 +119,15 @@ import BioKit.Gene;
 import BioKit.RandomAccessGFFReader;
 import BioKit.Utils;
 
+/**
+ *    The SplicingWebApp class is the core of the GUI application. It creates all GUI elements and processes GUI interactions.
+ *    Currently, it also provides some functions for data processing (e.g. the selection of valid isoforms) that might be moved to
+ *    the DataSupplier in later versions of the program.
+ */
 public class SplicingWebApp extends Window
-{		
+{
+	private static final long serialVersionUID = 1L;
+	
 	private int				m_nThreads;
 	private String			m_strPathReferences;
 	private String			m_strPathInput;
@@ -155,7 +161,6 @@ public class SplicingWebApp extends Window
 	// this layout defines regions for buttons/options (north), the splice graph (west) and main plots (center)
 	private Borderlayout 			m_layout;
 	private North					m_layoutNorth;
-	private West					m_layoutWest;
 	private Center					m_layoutCenter;
 
 	private int						m_nMinCovPerBase;			// Used as threshold to exclude exons with low coverage
@@ -187,7 +192,6 @@ public class SplicingWebApp extends Window
 	ResultListHandler				m_resultListHandler;
 	
 	// stores information when clicking an element in the isoform plot
-	private ClickEvent 			m_ClickEvent;
 	Parameters					m_parameters;
 	
 	// grants access to the SQL junction and exon count data
@@ -207,6 +211,7 @@ public class SplicingWebApp extends Window
 	private Bandbox				m_bandboxSelectedGene;
 	private Listbox				m_listboxSelectedGene;
 	private Tree				m_treeSelectedIsoforms;	
+	private Textbox				m_textboxWindowWidth;
 	
 	private Checkbox 			m_checkboxUseMedian;
 	private Checkbox			m_checkboxUseGeometricMean;
@@ -218,6 +223,7 @@ public class SplicingWebApp extends Window
 	private Checkbox			m_checkboxShowSecondCoveragePlot;
 	private	Checkbox			m_checkboxHighlightUniqueExons;
 	private Checkbox			m_checkboxCoverageGrid;
+	private Checkbox			m_checkboxSwitchStrand;
 
 	private TreeSet<String>		m_vcSelectedSamples;	
 	private boolean				m_bUseReducedDataSet; 
@@ -232,8 +238,6 @@ public class SplicingWebApp extends Window
 	private boolean				m_bIsoformSelectionChanged;
 	private TreeSet<String>		m_vcValidIsoforms;
 	private TreeSet<ProjectModel> m_vcProjectInfos;
-	
-	private TreeMap<String, TreeMap<Integer, TreeSet<String>>> 	m_mapAnalysedJunctionPaths;
 	
 	DataSupplier 				m_dataSupplier;
 	
@@ -250,9 +254,6 @@ public class SplicingWebApp extends Window
 	private Textbox				m_textboxSampleSelectionList;
 	private Groupbox 			m_ColorSelectionGroupBox;
 	
-	// The relative coverage for each path and sample is stored in this map: <sample, <path_id, ratio>>
-	private TreeMap<String, TreeMap<Integer, Double>> 			m_mapCoveragePerJunctionPathAndSample;
-	
 	// values important for the popup windows	
 	private TreeSet<String> 				m_vcPreviouslySelectedSamples;	
 	private TreeSet<String>					m_vcPreviouslySelectedIsoforms;
@@ -264,6 +265,7 @@ public class SplicingWebApp extends Window
 	private TreeMap<String, TreeMap<String, Vector<Double>>> 	m_mapCountsPerExonAndTissue;
 	private TreeMap<String, Double> 							m_mapEntropyToExonicPart;
 	
+	/** Helper class used to store URL parameters */
 	private class Parameters
 	{
 		ProjectModel 	m_project;
@@ -288,6 +290,344 @@ public class SplicingWebApp extends Window
 		}
 	};
 	
+	/**
+	 *     Helper class used as thread to identify invalid isoforms based on the coverage of split reads
+	 *     - run once for each isoform
+	 */
+	public class ThreadRemoveIrrelevantIsoformsBasedOnSplitReads implements Runnable
+	{
+		String 										m_strIsoform;
+		String										m_strCondition;
+		TreeSet<String> 							m_vcIrrelevantIsoforms;
+		TreeMap<String, TreeSet<String>> 			m_vcSamplesPerCondition;
+//		TreeMap<String, TreeMap<String, Integer>> 	m_mapJunctionReadCounts;
+		boolean										m_bDebug;
+		boolean										m_bSkipFirstAndLastExon;
+		
+		ThreadRemoveIrrelevantIsoformsBasedOnSplitReads(String strIsoform, String strCondition, TreeSet<String> vcIrrelevantIsoforms, TreeMap<String, TreeSet<String>> vcSamplesPerCondition, boolean bSkipFirstAndLastExon, boolean bDebug)
+		{
+			m_strIsoform 			= strIsoform;
+			m_strCondition			= strCondition;
+			m_vcIrrelevantIsoforms	= vcIrrelevantIsoforms;
+			m_vcSamplesPerCondition = vcSamplesPerCondition;
+//			m_mapJunctionReadCounts = mapJunctionReadCounts;
+			m_bDebug				= bDebug;
+			m_bSkipFirstAndLastExon = bSkipFirstAndLastExon;
+		}
+		
+		@Override
+		public void run()
+		{
+			//###################################
+			//    get number of valid samples
+			//###################################
+			int nSamples = 0;
+			for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
+			{
+				if(m_vcSelectedSamples.contains(strSample))
+					nSamples++;
+			}
+			
+			//##########################################################################################
+			//          check whether all junctions of the isoform have sufficient coverage
+			//##########################################################################################
+			TreeSet<CountElement> vcJunctions = m_dataSupplier.GetJunctionsForIsoform(m_strIsoform);
+			int nJunIdx = 0;
+			
+			for(CountElement jun : vcJunctions)
+			{
+				if(m_bSkipFirstAndLastExon)
+				{
+					// skip first and last junction
+					if(nJunIdx == 0 || nJunIdx == vcJunctions.size()-1)
+					{
+						if(nJunIdx == 0)
+							nJunIdx = 1;
+						continue;
+					}
+				}				
+
+				// get counts for the junction
+				TreeMap<String, Integer> mapCountsToJunction = m_dataSupplier.GetCountsForJunction(jun);
+
+				double pCounts[] = new double[nSamples];
+				int nIdx = 0;
+				for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
+				{	
+					if(m_vcSelectedSamples.contains(strSample))
+					{
+						if(mapCountsToJunction == null)
+							pCounts[nIdx] = 0;
+						else
+						{
+								
+							if(mapCountsToJunction.containsKey(strSample))
+							{
+								pCounts[nIdx] = mapCountsToJunction.get(strSample);
+							}
+							else
+							{
+								pCounts[nIdx] = 0;
+							}
+						}
+						nIdx++;
+					}
+				}
+				
+				//################################################
+				//    check whether the coverage is sufficient
+				//################################################
+				double fMedian = StatUtils.percentile(pCounts, 50.0);
+		
+				if(fMedian < m_nMinJunctionReads)
+				{
+					synchronized(m_vcIrrelevantIsoforms)
+					{
+						if(m_bDebug)
+						{
+							System.out.println("[min junctions reads] -> removing " + m_strIsoform);
+						}
+						m_vcIrrelevantIsoforms.add(m_strIsoform);
+						return;
+					}
+				}
+				
+				nJunIdx++;
+			}
+		}
+	}
+
+	/** 
+	 *    Helper class used as thread to identify invalid isoforms based on insufficient [exon] coverage
+     *    - run once for each isoform
+	 */
+	public class ThreadRemoveIrrelevantIsoformsBasedOnCoverage implements Runnable
+	{
+		String 										m_strIsoform;
+		String										m_strCondition;
+		TreeSet<String> 							m_vcIrrelevantIsoforms;
+		TreeMap<String, TreeSet<String>> 			m_vcSamplesPerCondition;
+		TreeMap<String, TreeMap<String, Integer>> 	m_mapJunctionReadCounts;
+		boolean										m_bDebug;
+		boolean										m_bSkipFirstAndLastExon;
+		
+		ThreadRemoveIrrelevantIsoformsBasedOnCoverage(String strIsoform, String strCondition, TreeSet<String> vcIrrelevantIsoforms, TreeMap<String, TreeSet<String>> vcSamplesPerCondition, boolean bSkipFirstAndLastExon, boolean bDebug)
+		{
+			m_strIsoform 			= strIsoform;
+			m_strCondition			= strCondition;
+			m_vcIrrelevantIsoforms	= vcIrrelevantIsoforms;
+			m_vcSamplesPerCondition = vcSamplesPerCondition;
+			m_bDebug 				= bDebug;
+			m_bSkipFirstAndLastExon	= bSkipFirstAndLastExon;
+		}
+		
+		@Override
+		public void run()
+		{
+			// skip already irrelevant isoforms
+			if(m_vcIrrelevantIsoforms.contains(m_strIsoform))
+				return;
+			
+			int nSamples = 0;
+			for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
+			{
+				if(m_vcSelectedSamples.contains(strSample))
+					nSamples++;
+			}
+			
+			//#######################################################################
+			//    remove all isoforms where the coverage of some exon groups is much
+			//    lower than for the other exon groups of the isoform
+			//    IGNORE first and last exons
+			//#######################################################################
+			Exon pExons[] = m_dataSupplier.GetExonsForIsoform(m_strIsoform);
+		
+			for(Exon ex : pExons)
+			{
+				boolean bIsFirstExon = false;
+				boolean bIsLastExon  = false;
+				if(ex.equals(pExons[0]))
+					bIsFirstExon = true;
+				
+				if(ex.equals(pExons[pExons.length-1]))
+					bIsLastExon = true;
+				
+				// skip first and last exons?
+				if(m_bSkipFirstAndLastExon && (bIsFirstExon || bIsLastExon))
+					continue;
+				
+				// get average expression of the exon for the given condition
+				double pCoverages[] 	= new double[nSamples];
+				double pCoveredBases[] 	= new double[nSamples];
+				
+				int nSample = 0;
+				for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
+				{
+					if(m_vcSelectedSamples.contains(strSample))
+					{					
+						// combine coverage of all exons within the exon group for first and last exons
+						if(bIsFirstExon || bIsLastExon)
+						{
+							ExonGroup[] grps = m_dataSupplier.GetExonGroups();
+							for(ExonGroup grp : grps)
+							{
+								if(grp.groupContainsExon(ex.getExonID()))
+								{
+									double fCoverage = 0.0f;
+									double fCoverageLength = 0.0;
+									
+									for(Exon exon : grp.getExons())
+									{
+										// Only merge first with other first exons and last with other last exons
+										String vcIsoforms[] = m_dataSupplier.GetIsoformNames();
+										boolean bOkay = false;
+										
+										for(String strIsoform : vcIsoforms)
+										{
+											if(!m_vcIrrelevantIsoforms.contains(strIsoform))
+											{
+												Exon pIsoformExons[] = m_dataSupplier.GetExonsForIsoform(strIsoform);
+												
+												if((pIsoformExons[0] == exon && bIsFirstExon) || (pIsoformExons[pIsoformExons.length-1] == exon && bIsLastExon))
+												{
+													// exons must also overlap
+													if(exon.getCodingStart() <= ex.getCodingStop() && exon.getCodingStop() >= ex.getCodingStart())
+													{
+														bOkay=true;
+													}
+												}
+												// also keep it if it the last/first exon is completely contained in another exon
+												else if(exon.getCodingStart() <= ex.getCodingStart() && exon.getCodingStop() >= ex.getCodingStop())
+												{
+													bOkay=true;
+												}
+											}
+										}
+										
+										if(bOkay)
+										{
+											fCoverage		 += m_dataSupplier.GetRawCoverageForExonAndSample(exon, strSample);
+											fCoverageLength  += m_dataSupplier.GetCoverageFractionForExonAndSample(exon, strSample);
+										}
+									}
+
+									pCoverages[nSample] 	= fCoverage;
+									pCoveredBases[nSample]	= fCoverageLength;
+									
+									break;
+								}
+							}
+						}
+						else
+						{
+							pCoverages[nSample] 	= m_dataSupplier.GetRawCoverageForExonAndSample(ex, strSample);
+							pCoveredBases[nSample]	= m_dataSupplier.GetCoverageFractionForExonAndSample(ex, strSample);
+						}
+						nSample += 1;
+					}
+				}
+				
+				double fCoverageMedian		 = StatUtils.percentile(pCoverages, 50.0);
+				double fCoveredBasesMedian 	 = StatUtils.percentile(pCoveredBases, 50.0);
+				
+				// do not apply number-of-covered-bases-test to first/last exons
+				if((fCoveredBasesMedian < m_fMinCoveredBases && !bIsFirstExon && !bIsLastExon) || fCoverageMedian < m_nMinCovPerBase)
+				{
+					synchronized(m_vcIrrelevantIsoforms)
+					{
+						m_vcIrrelevantIsoforms.add(m_strIsoform);
+					}						
+
+					if(m_bDebug)
+					{
+						System.out.println("(" + m_strCondition + ") isoform irrelevant: " + m_strIsoform);
+						if(fCoveredBasesMedian < m_fMinCoveredBases)
+						{
+							System.out.println("first: " + bIsFirstExon);
+							System.out.println("last: " + bIsFirstExon);
+							System.out.println("(" + m_strCondition + ") Reason: insufficiently covered exon: " + ex.getCodingStart() + "-" + ex.getCodingStop() + " " + fCoveredBasesMedian + " < " + m_fMinCoveredBases);
+//							System.out.println(Arrays.toString(pCoveredBases));
+						}
+						else
+						{
+							System.out.println("first: " + bIsFirstExon);
+							System.out.println("last: " + bIsFirstExon);
+							System.out.println("(" + m_strCondition + ") Reason: coverage too low for exon: " + ex.getCodingStart() + "-" + ex.getCodingStop() + " " + fCoverageMedian + " < " + m_nMinCovPerBase);
+						}
+					}
+					return;
+				}
+			}
+		}
+	}
+
+	/** 
+	 *    Helper class used as thread to read the coverage for a gene from bigwig files
+	 *    - run once for each sample
+	 */
+	public class ThreadReadBigWigCoverage implements Runnable
+	{
+		Gene 					m_Gene;
+		String 					m_strSample;
+		TreeMap<String, int[]>	m_mapBigWigCoverageToSamples;
+		String					m_strFile;
+		
+		ThreadReadBigWigCoverage(Gene gene, String strSample, String strFile, TreeMap<String, int[]> mapBigWigCoverageToSamples)
+		{
+			m_strSample 					= strSample;
+			m_Gene							= gene;
+			m_mapBigWigCoverageToSamples 	= mapBigWigCoverageToSamples;
+			m_strFile						= strFile;
+		}
+		
+		@Override
+		public void run()
+		{
+			int nStart 	= m_Gene.getStart();
+			int nEnd	= m_Gene.getStop();
+			
+			BigWigReader reader = null;
+			
+			try
+			{
+				reader = new BigWigReader(m_strFile);
+			}
+			catch(IOException ex)
+			{
+				System.out.println(ex.getMessage());
+				return;
+			}
+
+			BigWigIterator it = reader.getBigWigIterator(m_Gene.getChromosome(), nStart-1, m_Gene.getChromosome(), nEnd, false);
+
+			int pValues[] = new int[nEnd-nStart+1];
+			
+			while(it.hasNext())
+			{
+				WigItem item = it.next();
+				int nIdx = item.getEndBase() - nStart;						
+				int nValue = (int)item.getWigValue();
+				
+				pValues[nIdx] = nValue;
+			}
+			
+			try
+			{
+				reader.close();
+			}
+			catch(IOException ex)
+			{
+				System.out.println(ex.getMessage());
+			}
+			
+			synchronized(m_mapBigWigCoverageToSamples)
+			{
+				m_mapBigWigCoverageToSamples.put(m_strSample, pValues);
+			}
+		}
+	}
+
+	/** Inits the application without the GUI */
 	public SplicingWebApp(boolean bEmpty) throws IOException
 	{
 		Configure4JLogger();
@@ -299,10 +639,7 @@ public class SplicingWebApp extends Window
 		m_dataSupplier 		= new DataSupplier();
 
 		m_vcValidIsoforms	= new TreeSet<String>();
-		
-		m_mapCoveragePerJunctionPathAndSample = new TreeMap<String, TreeMap<Integer, Double>>();
-		
-		m_ClickEvent		= new ClickEvent();
+
 		m_projectModel 		= new ProjectModel();
 		m_vcProjectInfos 	= new TreeSet<ProjectModel>();
 		
@@ -318,7 +655,6 @@ public class SplicingWebApp extends Window
 		m_bGTEXAvailableForExons = false;
 		
 		m_layoutNorth		= new North();
-		m_layoutWest		= new West();
 		m_layoutCenter		= new Center();
 				
 		m_layoutMainTop	 	= new North();
@@ -331,6 +667,7 @@ public class SplicingWebApp extends Window
 		m_bWindowSizeChanged = false;
 	}
 
+	/** inits the application with GUI */
 	public SplicingWebApp() throws Exception
 	{
 		Configure4JLogger();
@@ -338,7 +675,6 @@ public class SplicingWebApp extends Window
 		m_hWindow			= this;
 		m_plotFactory	 	= new PlotFactory(m_hWindow);
 		m_plotFactoryGTEX 	= new PlotFactoryGTEX(m_hWindow);
-		m_ClickEvent		= new ClickEvent();
 		m_gffReader			= null;
 
 		ReadAppPaths();	
@@ -350,7 +686,6 @@ public class SplicingWebApp extends Window
 		m_imgMapColors		= null;
 		
 		m_layoutNorth		= new North();
-		m_layoutWest		= new West();
 		m_layoutCenter		= new Center();
 				
 		m_layoutMainTop	 	= new North();
@@ -368,9 +703,6 @@ public class SplicingWebApp extends Window
 		m_nMinCovPerBase					= 5;
 		m_fMinCoveredBases					= 0.7;
 		m_fVariableExonThreshold			= 0.05;		
-
-		m_mapAnalysedJunctionPaths	 			= new TreeMap<String, TreeMap<Integer, TreeSet<String>>>();
-		m_mapCoveragePerJunctionPathAndSample 	= new TreeMap<String, TreeMap<Integer, Double>>();
 		
 		m_projectModel 						= new ProjectModel();
 		
@@ -404,6 +736,8 @@ public class SplicingWebApp extends Window
 				int nClientWindowHeight = event.getDesktopHeight();
 
 				m_plotFactory.SetClientSize(nClientWindowWidth, nClientWindowHeight);
+				
+				m_textboxWindowWidth.setText("" + nClientWindowWidth);
 			}
 		});
 		
@@ -481,7 +815,7 @@ public class SplicingWebApp extends Window
 				}
 				catch(Exception e)
 				{
-					Messagebox.show("ERROR: coult not open project file: " + m_parameters.m_project.GetFullPathOfProjectFile());
+					ErrorMessage.ShowError("ERROR: coult not open project file: " + m_parameters.m_project.GetFullPathOfProjectFile());
 					e.printStackTrace();
 					Clients.clearBusy();
 					return;
@@ -518,7 +852,7 @@ public class SplicingWebApp extends Window
 				}
 				catch(Exception e)
 				{
-					Messagebox.show("ERROR: could not open gene: " + m_parameters.m_gid.m_strApprovedGeneSymbol + " (" + m_parameters.m_gid.m_strEnsemblGeneID + ")");
+					ErrorMessage.ShowError("ERROR: could not open gene: " + m_parameters.m_gid.m_strApprovedGeneSymbol + " (" + m_parameters.m_gid.m_strEnsemblGeneID + ")");
 					e.printStackTrace();
 					Clients.clearBusy();
 					return;
@@ -576,7 +910,7 @@ public class SplicingWebApp extends Window
 					}
 					catch(Exception e)
 					{
-						Messagebox.show("ERROR: could not select isoforms");
+						ErrorMessage.ShowError("ERROR: could not select isoforms");
 						e.printStackTrace();
 						Clients.clearBusy();
 						return;
@@ -777,6 +1111,7 @@ public class SplicingWebApp extends Window
 		ProcessParameters();
 	}
 	
+	/** Retrieves and stores the URL parameters */
 	public void ProcessParameters()
 	{
 		m_parameters = new Parameters();
@@ -799,7 +1134,8 @@ public class SplicingWebApp extends Window
 				
 		if(m_parameters.m_project == null)
 		{
-			Messagebox.show("Invalid project identifier: " + nID);
+			ErrorMessage.ShowError("Invalid project identifier: " + nID);
+			return;
 		}
 		
 		// check if gene annotation file exists
@@ -817,7 +1153,7 @@ public class SplicingWebApp extends Window
 		GeneIdentifier gid = m_geneIdentifierHandler.GetGeneIdentifierForGene(strParameter, null);
 		if(gid == null)
 		{
-			Messagebox.show("unknown gene identifier: " + strParameter);			
+			ErrorMessage.ShowError("unknown gene identifier: " + strParameter);
 			return;
 		}
 		m_parameters.m_gid = gid;
@@ -859,531 +1195,189 @@ public class SplicingWebApp extends Window
 		}
 	}
 	
+	/** Returns the GTF/GFF reader */
 	public RandomAccessGFFReader GetGFFReader()
 	{
 		return m_gffReader;
 	}
 	
+	/** Returns the region (part of the GUI) that shows the coverage plots */
 	public North GetCoveragePlotRegion()
 	{
 		return m_layoutMainTop;
 	}
-	
-	public West GetPlotRegion()
-	{
-		return m_layoutWest;
-	}
 
-	public Borderlayout GetBorderLayout()
-	{
-		return m_layout;
-	}
-	
+	/** Returns the region (part of the GUI) that shows the isoform plots */
 	public Vlayout GetIsoformPlotRegion()
 	{
 		return m_layoutMainBottom;
 	}
 	
+	/** Returns the image map associated with the coverage plot */
 	public Imagemap GetImageMapForCoveragePlot()
 	{
 		return m_imgMapCoverage;
 	}
 	
+	/** Returns the image map associated with the isoform plot */
 	public Imagemap GetImageMapForIsoforms()
 	{
 		return m_imgMapIsoforms;
 	}
 	
-	public ClickEvent GetClickEvent()
-	{
-		return m_ClickEvent;
-	}
-	
+	/** Returns whether intron retention event detection is active */
 	public boolean DetectIntronRetentionEvents()
 	{
 		return m_bDetectIntronRetentionEvents;
 	}
 	
-	public boolean ProjectHasPairedData()
-	{
-		return m_projectModel.ProjectHasPairedData();
-	}
-	
+	/** Returns the list of valid isoforms (=isoforms that pass the automatic selection) */
 	public TreeSet<String> GetValidIsoforms()
 	{
 		return m_vcValidIsoforms;
 	}
 	
+	/** Returns the maximum allowed threads */
 	public int GetMaximumThreads()
 	{
 		return m_nThreads;
 	}
 	
+	/** Returns the selected condition type */
 	public String GetSelectedConditionType()
 	{
 		return m_strSelectedConditionType;
 	}
 	
+	/** Returns the selected condition */
 	public String GetSelectedCondition()
 	{
 		return m_strSelectedCondition;
 	}
 	
-	public String GetPathToMMSeqExecutable()
-	{
-		return m_strMMSeqExecutable;
-	}
-	
+	/** Returns the path to the MMSeq results */
 	public String GetPathToMMSeqResults()
 	{
 		return m_strPathMMSeqResults;
 	}
-	
-	public String GetPathToTemporaryDirectory()
-	{
-		return m_strTmpFolder;
-	}
-	
-	public String GetScreenshotDirectory()
-	{
-		return m_strScreenshotPath;
-	}
-	
+		
+	/** Returns a list of all selected samples */
 	public TreeSet<String> GetSelectedSamples()
 	{
 		return m_vcSelectedSamples;
 	}
 	
+	/** Returns the minimum coverage per base used to identify valid isoforms */
 	public int GetMinimumCoveragePerBase()
 	{
 		return m_nMinCovPerBase;
 	}
 	
+	/** Returns the minimum number of junction spanning reads used to identify valid isoforms */
 	public int GetMinimumJunctionReads()
 	{
 		return m_nMinJunctionReads;
 	}
 	
+	/** Returns the minimum fraction (e.g. 0.7) of bases of a gene that must be covered to identify valid isoforms */
 	public double GetMinimumCoveredBases()
 	{
 		return m_fMinCoveredBases;
 	}
-	
+		
+	/** Returns the coverage ratio threshold used to identify "variable" (=potentially alternatively spliced) exon */
 	public double GetVariableExonThreshold()
 	{
 		return m_fVariableExonThreshold;
 	}
 	
+	/** Returns the currently selected result from the result list */
 	public AnalysisResult GetSelectedResult()
 	{
 		return m_selectedResult;
 	}
 	
+	/** Returns the GTF file */
 	public String GetGTFFile()
 	{
 		return m_strFileGTF;
 	}
 	
-	public int GetReferenceType()
-	{
-		return m_nReferenceType;
-	}
-	
+	/** Returns the project model that stores all information associated with the project */
 	public ProjectModel GetProjectModel()
 	{
 		return m_projectModel;
 	}
 	
+	/** Returns the data supplier. The data supplier stores coverage and read data for the currently selected gene */
 	public DataSupplier GetDataSupplier()
 	{
 		return m_dataSupplier;
 	}
 	
+	/** Returns the result handler that stores the potential AS events for the current view */
 	public AnalysisResultHandler GetResultHandler()
 	{
 		return m_vcASResults;
 	}
 	
+	/** Returns the gene identifier handler that stores gene symbols and various gene IDs per gene */ 
 	public GeneIdentifierHandler GetGeneIdentifierHandler()
 	{
 		return m_geneIdentifierHandler;
 	}
-
+	
+	/** 
+	 *    Sets the number of threads available to the application
+	 *    - only used by the console application (the GUI reads this value from the app_config file)
+	 */
 	public void SetNumberOfThreads(int nThreads)
 	{
 		m_nThreads = nThreads;
 		System.out.println("set max. number of threads to " + nThreads);
 	}
-		
+	
+	/** 
+	 *    Sets the currently selected condition type
+	 *    - only used by the console application
+	 */
 	public void SetConditionType(String strConditionType)
 	{
 		m_strSelectedConditionType = strConditionType;
 	}
-		
+	
+	/**
+	 *    Removes data associated with the current gene
+	 *    - only used by the console application
+	 */
 	public void ClearCurrentGeneData()
 	{
 		m_dataSupplier.Clear();
 		m_vcValidIsoforms.clear();
 	}
-
+	
+	/** Returns whether entropy values should be plotted */
 	public boolean IsEntropyEnabled()
 	{
 		return m_bShowEntropyData;
 	}
 	
+	/**
+	 *    Returns whether entropy values should be plotted per exonic part
+	 *    - redundant to the above, should be removed in a future version
+	 */
 	public TreeMap<String, Double> GetEntropyPerExonicPart()
 	{
 		return m_mapEntropyToExonicPart;
 	}
 	
+	/** Returns the read counts of a specified exonic part for all tissues */	
 	public TreeMap<String, Vector<Double>> GetCountsForGTEXExonicPart(String strExonicPartID)
 	{
 		return m_mapCountsPerExonAndTissue.get(strExonicPartID);
 	}
-	
-	public TreeMap<String, TreeMap<Integer, TreeSet<String>>> GetAnalysedJunctionPaths()
-	{
-		return m_mapAnalysedJunctionPaths;
-	}
-	
-	public TreeMap<String, TreeMap<Integer, Double>> GetCoveragePerJunctionPathAndSample()
-	{
-		return m_mapCoveragePerJunctionPathAndSample;
-	}
-	
-	public void ShowGTEXDataForExon(String strExon)
-	{
-		m_plotFactoryGTEX.ShowGTEXDataForExon(strExon);
-	}
-	
-	public class ThreadRemoveIrrelevantIsoformsBasedOnSplitReads implements Runnable
-	{
-		String 										m_strIsoform;
-		String										m_strCondition;
-		TreeSet<String> 							m_vcIrrelevantIsoforms;
-		TreeMap<String, TreeSet<String>> 			m_vcSamplesPerCondition;
-//		TreeMap<String, TreeMap<String, Integer>> 	m_mapJunctionReadCounts;
-		boolean										m_bDebug;
-		boolean										m_bSkipFirstAndLastExon;
-		
-		ThreadRemoveIrrelevantIsoformsBasedOnSplitReads(String strIsoform, String strCondition, TreeSet<String> vcIrrelevantIsoforms, TreeMap<String, TreeSet<String>> vcSamplesPerCondition, boolean bSkipFirstAndLastExon, boolean bDebug)
-		{
-			m_strIsoform 			= strIsoform;
-			m_strCondition			= strCondition;
-			m_vcIrrelevantIsoforms	= vcIrrelevantIsoforms;
-			m_vcSamplesPerCondition = vcSamplesPerCondition;
-//			m_mapJunctionReadCounts = mapJunctionReadCounts;
-			m_bDebug				= bDebug;
-			m_bSkipFirstAndLastExon = bSkipFirstAndLastExon;
-		}
-		
-		@Override
-		public void run()
-		{
-			//###################################
-			//    get number of valid samples
-			//###################################
-			int nSamples = 0;
-			for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
-			{
-				if(m_vcSelectedSamples.contains(strSample))
-					nSamples++;
-			}
-			
-			//##########################################################################################
-			//          check whether all junctions of the isoform have sufficient coverage
-			//##########################################################################################
-			TreeSet<CountElement> vcJunctions = m_dataSupplier.GetJunctionsForIsoform(m_strIsoform);
-			int nJunIdx = 0;
-			
-			for(CountElement jun : vcJunctions)
-			{
-				if(m_bSkipFirstAndLastExon)
-				{
-					// skip first and last junction
-					if(nJunIdx == 0 || nJunIdx == vcJunctions.size()-1)
-					{
-						if(nJunIdx == 0)
-							nJunIdx = 1;
-						continue;
-					}
-				}				
 
-				// get counts for the junction
-				TreeMap<String, Integer> mapCountsToJunction = m_dataSupplier.GetCountsForJunction(jun);
-
-				double pCounts[] = new double[nSamples];
-				int nIdx = 0;
-				for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
-				{	
-					if(m_vcSelectedSamples.contains(strSample))
-					{
-						if(mapCountsToJunction == null)
-							pCounts[nIdx] = 0;
-						else
-						{
-								
-							if(mapCountsToJunction.containsKey(strSample))
-							{
-								pCounts[nIdx] = mapCountsToJunction.get(strSample);
-							}
-							else
-							{
-								pCounts[nIdx] = 0;
-							}
-						}
-						nIdx++;
-					}
-				}
-				
-				//################################################
-				//    check whether the coverage is sufficient
-				//################################################
-				double fMedian = StatUtils.percentile(pCounts, 50.0);
-		
-				if(fMedian < m_nMinJunctionReads)
-				{
-					synchronized(m_vcIrrelevantIsoforms)
-					{
-						if(m_bDebug)
-						{
-							System.out.println("[min junctions reads] -> removing " + m_strIsoform);
-						}
-						m_vcIrrelevantIsoforms.add(m_strIsoform);
-						return;
-					}
-				}
-				
-				nJunIdx++;
-			}
-		}
-	}
-
-	public class ThreadRemoveIrrelevantIsoformsBasedOnCoverage implements Runnable
-	{
-		String 										m_strIsoform;
-		String										m_strCondition;
-		TreeSet<String> 							m_vcIrrelevantIsoforms;
-		TreeMap<String, TreeSet<String>> 			m_vcSamplesPerCondition;
-		TreeMap<String, TreeMap<String, Integer>> 	m_mapJunctionReadCounts;
-		boolean										m_bDebug;
-		boolean										m_bSkipFirstAndLastExon;
-		
-		ThreadRemoveIrrelevantIsoformsBasedOnCoverage(String strIsoform, String strCondition, TreeSet<String> vcIrrelevantIsoforms, TreeMap<String, TreeSet<String>> vcSamplesPerCondition, boolean bSkipFirstAndLastExon, boolean bDebug)
-		{
-			m_strIsoform 			= strIsoform;
-			m_strCondition			= strCondition;
-			m_vcIrrelevantIsoforms	= vcIrrelevantIsoforms;
-			m_vcSamplesPerCondition = vcSamplesPerCondition;
-			m_bDebug 				= bDebug;
-			m_bSkipFirstAndLastExon	= bSkipFirstAndLastExon;
-		}
-		
-		@Override
-		public void run()
-		{
-			// skip already irrelevant isoforms
-			if(m_vcIrrelevantIsoforms.contains(m_strIsoform))
-				return;
-			
-			int nSamples = 0;
-			for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
-			{
-				if(m_vcSelectedSamples.contains(strSample))
-					nSamples++;
-			}
-			
-			//#######################################################################
-			//    remove all isoforms where the coverage of some exon groups is much
-			//    lower than for the other exon groups of the isoform
-			//    IGNORE first and last exons
-			//#######################################################################
-			Exon pExons[] = m_dataSupplier.GetExonsForIsoform(m_strIsoform);
-		
-			for(Exon ex : pExons)
-			{
-				boolean bIsFirstExon = false;
-				boolean bIsLastExon  = false;
-				if(ex.equals(pExons[0]))
-					bIsFirstExon = true;
-				
-				if(ex.equals(pExons[pExons.length-1]))
-					bIsLastExon = true;
-				
-				// skip first and last exons?
-				if(m_bSkipFirstAndLastExon && (bIsFirstExon || bIsLastExon))
-					continue;
-				
-				// get average expression of the exon for the given condition
-				double pCoverages[] 	= new double[nSamples];
-				double pCoveredBases[] 	= new double[nSamples];
-				
-				int nSample = 0;
-				for(String strSample : m_vcSamplesPerCondition.get(m_strCondition))
-				{
-					if(m_vcSelectedSamples.contains(strSample))
-					{					
-						// combine coverage of all exons within the exon group for first and last exons
-						if(bIsFirstExon || bIsLastExon)
-						{
-							ExonGroup[] grps = m_dataSupplier.GetExonGroups();
-							for(ExonGroup grp : grps)
-							{
-								if(grp.groupContainsExon(ex.getExonID()))
-								{
-									double fCoverage = 0.0f;
-									double fCoverageLength = 0.0;
-									
-									for(Exon exon : grp.getExons())
-									{
-										// Only merge first with other first exons and last with other last exons
-										String vcIsoforms[] = m_dataSupplier.GetIsoformNames();
-										boolean bOkay = false;
-										
-										for(String strIsoform : vcIsoforms)
-										{
-											if(!m_vcIrrelevantIsoforms.contains(strIsoform))
-											{
-												Exon pIsoformExons[] = m_dataSupplier.GetExonsForIsoform(strIsoform);
-												
-												if((pIsoformExons[0] == exon && bIsFirstExon) || (pIsoformExons[pIsoformExons.length-1] == exon && bIsLastExon))
-												{
-													// exons must also overlap
-													if(exon.getCodingStart() <= ex.getCodingStop() && exon.getCodingStop() >= ex.getCodingStart())
-													{
-														bOkay=true;
-													}
-												}
-												// also keep it if it the last/first exon is completely contained in another exon
-												else if(exon.getCodingStart() <= ex.getCodingStart() && exon.getCodingStop() >= ex.getCodingStop())
-												{
-													bOkay=true;
-												}
-											}
-										}
-										
-										if(bOkay)
-										{
-											fCoverage		 += m_dataSupplier.GetRawCoverageForExonAndSample(exon, strSample);
-											fCoverageLength  += m_dataSupplier.GetCoverageFractionForExonAndSample(exon, strSample);
-										}
-									}
-
-									pCoverages[nSample] 	= fCoverage;
-									pCoveredBases[nSample]	= fCoverageLength;
-									
-									break;
-								}
-							}
-						}
-						else
-						{
-							pCoverages[nSample] 	= m_dataSupplier.GetRawCoverageForExonAndSample(ex, strSample);
-							pCoveredBases[nSample]	= m_dataSupplier.GetCoverageFractionForExonAndSample(ex, strSample);
-						}
-						nSample += 1;
-					}
-				}
-				
-				double fCoverageMedian		 = StatUtils.percentile(pCoverages, 50.0);
-				double fCoveredBasesMedian 	 = StatUtils.percentile(pCoveredBases, 50.0);
-				
-				// do not apply number-of-covered-bases-test to first/last exons
-				if((fCoveredBasesMedian < m_fMinCoveredBases && !bIsFirstExon && !bIsLastExon) || fCoverageMedian < m_nMinCovPerBase)
-				{
-					synchronized(m_vcIrrelevantIsoforms)
-					{
-						m_vcIrrelevantIsoforms.add(m_strIsoform);
-					}						
-
-					if(m_bDebug)
-					{
-						System.out.println("(" + m_strCondition + ") isoform irrelevant: " + m_strIsoform);
-						if(fCoveredBasesMedian < m_fMinCoveredBases)
-						{
-							System.out.println("first: " + bIsFirstExon);
-							System.out.println("last: " + bIsFirstExon);
-							System.out.println("(" + m_strCondition + ") Reason: insufficiently covered exon: " + ex.getCodingStart() + "-" + ex.getCodingStop() + " " + fCoveredBasesMedian + " < " + m_fMinCoveredBases);
-//							System.out.println(Arrays.toString(pCoveredBases));
-						}
-						else
-						{
-							System.out.println("first: " + bIsFirstExon);
-							System.out.println("last: " + bIsFirstExon);
-							System.out.println("(" + m_strCondition + ") Reason: coverage too low for exon: " + ex.getCodingStart() + "-" + ex.getCodingStop() + " " + fCoverageMedian + " < " + m_nMinCovPerBase);
-						}
-					}
-					return;
-				}
-			}
-		}
-	}
-
-	public class ThreadReadBigWigCoverage implements Runnable
-	{
-		Gene 					m_Gene;
-		String 					m_strSample;
-		TreeMap<String, int[]>	m_mapBigWigCoverageToSamples;
-		String					m_strFile;
-		
-		ThreadReadBigWigCoverage(Gene gene, String strSample, String strFile, TreeMap<String, int[]> mapBigWigCoverageToSamples)
-		{
-			m_strSample 					= strSample;
-			m_Gene							= gene;
-			m_mapBigWigCoverageToSamples 	= mapBigWigCoverageToSamples;
-			m_strFile						= strFile;
-		}
-		
-		@Override
-		public void run()
-		{
-			int nStart 	= m_Gene.getStart();
-			int nEnd	= m_Gene.getStop();
-			
-			BigWigReader reader = null;
-			
-			try
-			{
-				reader = new BigWigReader(m_strFile);
-			}
-			catch(IOException ex)
-			{
-				System.out.println(ex.getMessage());
-				return;
-			}
-
-			BigWigIterator it = reader.getBigWigIterator(m_Gene.getChromosome(), nStart-1, m_Gene.getChromosome(), nEnd, false);
-
-			int pValues[] = new int[nEnd-nStart+1];
-			
-			while(it.hasNext())
-			{
-				WigItem item = it.next();
-				int nIdx = item.getEndBase() - nStart;						
-				int nValue = (int)item.getWigValue();
-				
-				pValues[nIdx] = nValue;
-			}
-			
-			try
-			{
-				reader.close();
-			}
-			catch(IOException ex)
-			{
-				System.out.println(ex.getMessage());
-			}
-			
-			synchronized(m_mapBigWigCoverageToSamples)
-			{
-				m_mapBigWigCoverageToSamples.put(m_strSample, pValues);
-			}
-		}
-	}
-
-	private static final long serialVersionUID = 1L;
-
-	// just to avoid the warning message...
+	/** Init the Log4j Logger to get reid of the warning message... */
 	public void Configure4JLogger()
 	{
 		// just disable it, we are not using it anyway
@@ -1404,6 +1398,10 @@ public class SplicingWebApp extends Window
 	    PropertyConfigurator.configure(properties);
 	}
 
+	/** 
+	 *    Sets the application paths, e.g. tells the application where to find
+	 *    third party tools, reference sequences and project data
+	 */
 	public void ReadAppPaths() throws IOException
 	{
 		String strFileName = null;
@@ -1511,6 +1509,7 @@ public class SplicingWebApp extends Window
 		m_plotFactoryGTEX.SetPaths(strPathGeneGTEX);
 	}
 	
+	/** Reads a gene (specified by gene identifier) from a GTF file	 */
 	public Gene ReadGeneFromFile(GeneIdentifier gid, String strFileGTF) throws Exception
 	{
 		if(strFileGTF == null)
@@ -1539,62 +1538,16 @@ public class SplicingWebApp extends Window
 			gene = m_gffReader.ReadGene(strGene);
 		}
 		
-		/*
-		else if(m_nReferenceType == REFFLAT_REFERENCE_FILE)
-		{
-			Scanner pIn = new Scanner(pFile);
-			
-			String strGene = gid.m_strRefGeneID;
-			
-			while(pIn.hasNextLine())
-			{
-				String strLine = pIn.nextLine();
-				
-				if(strLine.startsWith("#"))
-					continue;
-				
-				String pSplit[] = strLine.split("\\s+");
-				
-				String strGeneID = pSplit[1];
-				String strRef = pSplit[2];
-				int nStart  = Integer.parseInt(pSplit[4])+1; // must be made 1-based
-				int nEnd	= Integer.parseInt(pSplit[5]);  
-				String strGeneSymbol = pSplit[12];
-				
-				if(strGeneID.equals(strGene) || (gene != null && gene.getGeneName().equals(strGeneSymbol) && gene.getStart() <= nEnd && gene.getStop() >= nStart && gene.getChromosome().equals(strRef)))
-				{
-					boolean bFirstStrand = false;
-					if(pSplit[3].equals("+"))
-						bFirstStrand = true;
-					
-					Gene trans = new Gene(strGeneID, strGeneSymbol, "?", nStart, nEnd, strRef, bFirstStrand);
-					trans.ParseFromRefFlat(pSplit);
-
-					if(gene == null)
-						gene = trans;
-					
-					// add new isoform to current gene
-					gene.addGeneProduct(strGeneID,  "", trans.getSortedExons());
-				}
-			}
-			
-			pIn.close();
-		}
-		else
-		{
-			Messagebox.show("Invalid reference file detected");
-		}
-		*/
-
 		if(gene == null)
 		{
-			Messagebox.show("Could not find " + gid.m_strApprovedGeneSymbol + " (" + gid.m_strEnsemblGeneID  + ") in GTF file.");
+			ErrorMessage.ShowError("Could not find " + gid.m_strApprovedGeneSymbol + " (" + gid.m_strEnsemblGeneID  + ") in GTF file.");
 			return null;
 		}
 		
 		return gene;
 	}
 	
+	/** Resets the list of valid isoforms (selects all available isoforms) */
 	public void InitValidIsoforms(Gene gene)
 	{
 		m_vcValidIsoforms.clear();
@@ -1606,7 +1559,11 @@ public class SplicingWebApp extends Window
 		}
 	}
 	
-	// the gene parameter is optional and may be null
+	/** 
+	 *    Calls ReadGeneFromFile (unless the 'gene' parameter is not null) and then uses the gene to fill the data supplier with data.
+	 *    Also resets the valid isoforms.
+	 *    the gene parameter is optional and may be null
+	 */
 	public void ProcessGeneInformation(GeneIdentifier gid, String strFileGTF, Gene gene) throws Exception
 	{
 		if(gene == null)
@@ -1615,18 +1572,24 @@ public class SplicingWebApp extends Window
 		if(gene == null)
 			return;
 		
+		// reset valid isoforms
 		InitValidIsoforms(gene);
 		
-//		DetermineValidIsoforms();
 		m_bIsoformSelectionChanged = true;
 	
 		// get coverage from bigwig files and junction counts, also detects invalid samples and conditions
 		PrepareDataSupplier(gene);
-		
+
+		// update isoform selection window
 		OnIsoformChange(true);
 	}
 	
-	// get coverage from bigwig files and junction counts, also detects invalid samples and conditions
+	/**
+	 *    Fills the data supplier with data such as:
+	 *   - exon coverage from bigwig files,
+	 *   - junction counts from count files
+	 *   Also identifies junctions with insufficient coverage.
+	 */
 	public void PrepareDataSupplier(Gene gene)
 	{
 		// prepare exon and exon group arrays
@@ -1637,25 +1600,19 @@ public class SplicingWebApp extends Window
 		m_dataSupplier.IdentifyInvalidJunctions(m_hWindow, false);
 	}
 
-	// calculates the exon coverage just using their posititon and the coverage in the bigwig files
-
-	//################################################################################################
-	//    Calculates the expression of an exon relative to all other exons in the same exon group.
-	//    Returns an map with the median relative coverage (value) per condition (key).
-	//################################################################################################
+	//TODO should be moved to the data supplier
+	/** Retrieves the coverage of a genomic region specified by reference name, start and end position for a given sample */
 	public double[] GetCoverageForRegion(String strRef, int nStart, int nEnd, String strSample, boolean bAdjustForSizeFactor) throws IOException
-	{		
-		// check whether bigwig and bam files are available for the samples
+	{
+		// get size factor
 		TreeMap<String, Double> mapSizeFactors = m_projectModel.GetSizeFactors();
+		double fSizeFactor = mapSizeFactors.get(strSample);
 		
+		// init empty array
 		int nLength = nEnd - nStart + 1;
 		double pCoverage[] = new double[nLength];
-		for(int i=0; i<pCoverage.length; i++)
-			pCoverage[i] = 0.0;
-		
-		// get size factor
-		double fSizeFactor = mapSizeFactors.get(strSample);
-
+		Arrays.fill(pCoverage, 0.0);
+	
 		double pBigWigCoverage[] = null;
 		
 		pBigWigCoverage = m_dataSupplier.GetGeneCoverageArrayForSample(strSample);
@@ -1667,7 +1624,7 @@ public class SplicingWebApp extends Window
 			
 			if(m_dataSupplier.GetGene() == null)
 			{
-				Messagebox.show("GetBigWigCoverageForGene - No gene selected");
+				ErrorMessage.ShowError("GetBigWigCoverageForGene - No gene selected");
 				return null;
 			}
 			
@@ -1721,110 +1678,22 @@ public class SplicingWebApp extends Window
 
 		return pCoverage;
 	}
-	
-	public double[] GetCoverageForExonGroup(ExonGroup grp, String strSample, boolean bAdjustForSizeFactor) throws IOException
-	{
-		//###################################
-		//    get coverage for exon group
-		//###################################
-		String strRef 	= m_dataSupplier.GetReferenceName();
-		int nGrpStart	= grp.getGenomicStartOfGroup();
-		int nGrpEnd		= grp.getGenomicStopOfGroup();
-		
-		return(GetCoverageForRegion(strRef, nGrpStart, nGrpEnd, strSample, bAdjustForSizeFactor));
-	}
-	
-	public double[] GetCoverageForExon(Exon ex, String strSample, boolean bAdjustForSizeFactor) throws IOException
-	{
-		//###################################
-		//    get coverage for single exon
-		//###################################
-		String strRef 	= m_dataSupplier.GetReferenceName();
-		int nStart		= ex.getCodingStart();
-		int nEnd		= ex.getCodingStop();
-		
-		return(GetCoverageForRegion(strRef, nStart, nEnd, strSample, bAdjustForSizeFactor));
-	}
 
-	//#################################################################################
-	//    returns isoforms that were choosen by the user by selecting certain exons
-	//#################################################################################
-	public TreeMap<String, int[]> GetSelectedIsoforms()
-	{
-		// <isoform_name, exon_ids>
-		TreeMap<String, int[]> mapValidIsoforms = new TreeMap<String, int[]>();
-		
-		// get first and second selected exon position
-		ExonGroup grpA = null;
-		ExonGroup grpB = null;
-
-		if(m_dataSupplier.GetExonGroups() != null)
-		{
-			for(ExonGroup grp : m_dataSupplier.GetExonGroups())
-			{
-				if(grp.getGenomicStartOfGroup() >= m_ClickEvent.m_nExonGroupStartA && grp.getGenomicStopOfGroup() <= m_ClickEvent.m_nExonGroupEndA)
-				{
-					grpA = grp;
-				}
-				
-				if(grp.getGenomicStartOfGroup() >= m_ClickEvent.m_nExonGroupStartB && grp.getGenomicStopOfGroup() <= m_ClickEvent.m_nExonGroupEndB)
-				{
-					grpB = grp;
-				}
-			}
-		}
-		
-		boolean bRequiresBothExons = false;
-		if(grpB != null)
-			bRequiresBothExons = true;
-
-		if(grpA != null && (grpB != null || !bRequiresBothExons))
-		{
-			String[] pIsoforms = m_dataSupplier.GetIsoformNames();
-			
-			for(String strIsoform : pIsoforms)
-			{		
-				Exon pExons[] = m_dataSupplier.GetExonsForIsoform(strIsoform);
-										
-				// get exon group for each exon
-				boolean bIncludesExonA = false;
-				boolean bIncludesExonB = false;
-				
-				for(Exon ex : pExons)
-				{
-					if(ex.getGenomicStart() >= grpA.getGenomicStartOfGroup() && ex.getGenomicStop() <= grpA.getGenomicStopOfGroup())
-						bIncludesExonA = true;
-					
-					if(grpB != null && ex.getGenomicStart() >= grpB.getGenomicStartOfGroup() && ex.getGenomicStop() <= grpB.getGenomicStopOfGroup())
-						bIncludesExonB = true;
-
-					if(bIncludesExonA && (bIncludesExonB || !bRequiresBothExons))
-						break;
-				}
-				
-				if(bIncludesExonA && (bIncludesExonB || !bRequiresBothExons))
-				{
-					int[] pExonIDs = new int[pExons.length];
-					int nIdx = 0;
-					for(Exon ex : pExons)
-					{
-						pExonIDs[nIdx] = ex.getExonID();
-						nIdx++;
-					}
-					mapValidIsoforms.put(strIsoform, pExonIDs);
-				}
-			}
-		}
-		return mapValidIsoforms;
-	}
-
+	/**
+	 *    This function is triggered when a new project is selected. It populates the project model with new data,
+	 *    clears all values associated with the previous project/gene and updates several GUI elements 
+	 */
 	public void OnProjectChange(String strProjectFile, boolean bHideMessage) throws Exception
 	{
 		m_strSelectedCondition 			= null;
 		m_strSelectedConditionType		= null;
 		
 		m_projectModel.clear();
-		m_projectModel.Init(strProjectFile, -1, -1, -1.0, -1, true);
+		if(!m_projectModel.Init(strProjectFile, -1, -1, -1.0, -1, true))
+		{
+			ErrorMessage.ShowError("Failed to open project: " + strProjectFile);
+			return;
+		}
 		
 		if(m_projectModel.GetSamples().size() > 50 && !bHideMessage)
 		{
@@ -1870,6 +1739,10 @@ public class SplicingWebApp extends Window
 		OnGeneChange(true, true);
 	}
 	
+	/**
+	 *    This function is triggered when a new condition type is selected.
+	 *    It updates the available conditions in the condition combo box. 
+	 */	
 	public void OnConditionTypeChange()
 	{
 		//############################################
@@ -1892,7 +1765,11 @@ public class SplicingWebApp extends Window
 		m_plotFactory.GetColorsPerCondition();
 		AddComboboxForSamples(null);
 	}
-	
+
+	/**
+	 *    This function is triggered when a new gene is selected. It clears data associated with the previous gene,
+	 *    processes the new gene information and updates some GUI elements.
+	 */
 	public void OnGeneChange(boolean bProjectChanged, boolean bIdentifyASExons) throws Exception
 	{
 		if(!m_projectModel.IsReady())
@@ -1920,8 +1797,6 @@ public class SplicingWebApp extends Window
 		// clear highlighted results
 		m_selectedResult = null;
 		
-		m_mapCoveragePerJunctionPathAndSample 	= new TreeMap<String, TreeMap<Integer, Double>>();
-		
 		if(m_mapCountsPerExonAndTissue != null)
 			m_mapCountsPerExonAndTissue.clear();
 		else
@@ -1936,8 +1811,6 @@ public class SplicingWebApp extends Window
 		
 		if(m_bandboxSelectedGene.getText().equals("Select Gene"))
 			return;
-		
-		m_ClickEvent.clear();
 
 		GeneIdentifier gid = m_geneIdentifierHandler.GetGeneIdentifierForGene(m_bandboxSelectedGene.getText(), null);
 		if(gid == null)
@@ -1958,6 +1831,11 @@ public class SplicingWebApp extends Window
 		InitComboboxForIsoformSelection();
 	}
 
+	/**
+	 *    This function is triggered when the isoforms change. If a new gene was selected it updates the result list
+	 *    of alternative splicing events, or else, it invokes an update of the data stored in the data supplier to reflect
+	 *    the data associated with the remaining isoforms.
+	 */
 	public boolean OnIsoformChange(boolean bNewGene) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException
 	{
 		m_plotFactory.ClearUnknownJunctions();
@@ -1982,6 +1860,7 @@ public class SplicingWebApp extends Window
 		return true;
 	}
 	
+	/** Helper function to remove a single isoform from the isoform selection. */
 	public void RemoveIsoformFromSelection(String strIsoform)
 	{		
 		for(Treeitem item : m_treeSelectedIsoforms.getItems())
@@ -2009,6 +1888,7 @@ public class SplicingWebApp extends Window
 		}
 	}
 	
+	/** Prepares the option menu */
 	public void AddSettingsMenu(Vlayout parentLayout) throws Exception
 	{
 		Groupbox grpBox = new Groupbox();
@@ -2023,16 +1903,19 @@ public class SplicingWebApp extends Window
 		
 		Vlayout layoutV = new Vlayout();
 		layoutV.setParent(layoutH);
-		
+
 		// add label for window size edit box
 		Label lab = new Label("Window width in pixel:");
 		lab.setStyle("margin-left: 10px");
 		lab.setParent(layoutV);
 		
+		Hlayout layoutH2 = new Hlayout();
+		layoutH2.setParent(layoutV);
+		
 		// add box for window size specification
-		Textbox m_textboxWindowWidth 	= new Textbox("Enter value");
-		m_textboxWindowWidth.setParent(layoutV);
-		m_textboxWindowWidth.setWidth("180px");
+		m_textboxWindowWidth = new Textbox("Enter value");
+		m_textboxWindowWidth.setParent(layoutH2);
+		m_textboxWindowWidth.setWidth("157px");
 		m_textboxWindowWidth.setStyle("margin-left: 10px;");
 		
 		m_textboxWindowWidth.addEventListener(Events.ON_CHANGING, new EventListener<Event>()
@@ -2109,6 +1992,27 @@ public class SplicingWebApp extends Window
 			}
 		});
 
+		Image btnResetWindowWidth = new Image("/img/red_cross.png");
+		btnResetWindowWidth.setWidth("18px");
+		btnResetWindowWidth.setHeight("18px");
+		btnResetWindowWidth.setStyle("margin-top: 4px; cursor:pointer;");
+		btnResetWindowWidth.setParent(layoutH2);
+		
+		btnResetWindowWidth.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+		{
+			public void onEvent(Event event) throws Exception
+			{	
+				int pSize[] = m_plotFactory.GetClientSize();
+				m_plotFactory.SetMaxWidth(pSize[0]);
+				m_plotFactory.RequestCoverageRedraw();
+						
+				if(m_dataSupplier.GetGene() != null)
+					m_plotFactory.DrawPlots();
+
+				m_textboxWindowWidth.setText("" + pSize[0]);
+			}
+		});
+				
 		layoutV = new Vlayout();
 		layoutV.setStyle("margin-left: 40px");
 		layoutV.setParent(layoutH);
@@ -2488,6 +2392,7 @@ public class SplicingWebApp extends Window
 		rgroup.setParent(layoutH);
 	}
 
+	/** Prepares the options menu */
 	public void AddOptionsMenu(Vlayout parentLayout)
 	{
 		Groupbox grpBox = new Groupbox();
@@ -2607,7 +2512,7 @@ public class SplicingWebApp extends Window
 			}
 		});	
 		
-		m_checkboxUseLog2 = new Checkbox("Show log2 tranformed");
+		m_checkboxUseLog2 = new Checkbox("Show log2 transformed");
 		m_checkboxUseLog2.setWidth("100%");
 		m_checkboxUseLog2.setParent(layoutV);
 		m_checkboxUseLog2.setChecked(m_plotFactory.IsLog2Enabled());
@@ -2619,9 +2524,27 @@ public class SplicingWebApp extends Window
 			}
 		});
 		
+		label = new Label("Isoform direction");
+		label.setStyle("margin-top: 10px; display:inline-block; text-decoration:underline");
+		label.setParent(layoutV);
+		
+		m_checkboxSwitchStrand = new Checkbox("swap strand automatically");
+		m_checkboxSwitchStrand.setWidth("100%");
+		m_checkboxSwitchStrand.setParent(layoutV);
+		m_checkboxSwitchStrand.setChecked(m_plotFactory.IsRelativeCoverageEnabled());
+		m_checkboxSwitchStrand.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+		{
+			public void onEvent(Event event) throws Exception
+			{
+				m_plotFactory.ToggleSwitchStrand(m_checkboxSwitchStrand.isChecked());
+				m_plotFactory.RequestCoverageRedraw();
+				m_plotFactory.DrawPlots();
+			}
+		});	
+		
 		Hbox layoutH2 = new Hbox();
 		layoutH2.setParent(layoutV);
-		layoutH2.setStyle("width: 100%; margin-top: 40px;");
+		layoutH2.setStyle("width: 100%; margin-top: 10px;");
 		
 		Image img = new Image();
 		img.setSrc("./img/help.png");
@@ -2649,7 +2572,7 @@ public class SplicingWebApp extends Window
 		
 		layoutV = new Vlayout();
 //		layoutV.setHflex("true");
-		layoutV.setHeight("252px");
+		layoutV.setHeight("262px");
 		layoutV.setParent(layoutH);
 		
 		//################################################
@@ -2836,6 +2759,7 @@ public class SplicingWebApp extends Window
 
 	}
 	
+	/** Prepares the advanced options menu */
 	public void AddAdvancedOptionsMenu(Vlayout parentLayout)
 	{
 		Groupbox grpBox = new Groupbox();
@@ -2843,7 +2767,7 @@ public class SplicingWebApp extends Window
 		grpBox.setMold("3d");
 		grpBox.setParent(parentLayout);
 		grpBox.setWidth("440px");
-		grpBox.setHeight("470px");
+		grpBox.setHeight("490px");
 
 		Hlayout layoutH = new Hlayout();
 		layoutH.setParent(grpBox);
@@ -3287,20 +3211,21 @@ public class SplicingWebApp extends Window
 		});
 	}
 
+	/** Prepares the color selection menu */
 	public void AddColorSelectionMenu(Vlayout parentLayout)
 	{
 		m_ColorSelectionGroupBox = new Groupbox();
 		m_ColorSelectionGroupBox.setTitle("Colors");
 		m_ColorSelectionGroupBox.setParent(parentLayout);		
 		m_ColorSelectionGroupBox.setWidth("200px");
-		m_ColorSelectionGroupBox.setHeight("470px");
+		m_ColorSelectionGroupBox.setHeight("490px");
 		m_ColorSelectionGroupBox.setContentStyle("overflow:auto;");
 		m_ColorSelectionGroupBox.setMold("3d");
 		
 		Button btn_SaveColorScheme = new Button("Save Color Scheme");
 		btn_SaveColorScheme.setParent(parentLayout);
 		btn_SaveColorScheme.setClass("button green");
-		btn_SaveColorScheme.setStyle("margin-left: 40px");
+		btn_SaveColorScheme.setStyle("display:inline-block; margin-left: 40px; margin-bottom: 10px;");
 		
 		btn_SaveColorScheme.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
@@ -3329,6 +3254,7 @@ public class SplicingWebApp extends Window
 		});
 	}
 	
+	/** Updates the color selection menu*/
 	public void UpdateColorSelection()
 	{
 		TreeMap<String, TreeSet<String>> mapSamplesToConditions = m_projectModel.GetSelectedSamplesPerCondition(m_strSelectedConditionType, m_vcSelectedSamples);
@@ -3414,6 +3340,7 @@ public class SplicingWebApp extends Window
 		});
 	}
 	
+	/** Updates the color selection popup window */
 	private void UpdateColorSelectionPopup(Imagemap imgMap, int nWidth, int nHeight, Color clr, String strCondition)
 	{
 		for(Component c : imgMap.getChildren())
@@ -3539,6 +3466,7 @@ public class SplicingWebApp extends Window
 		});
 	}
 
+	/** Processes a stored alternative splicing result and retrieves all data necessary for its visualization */
 	public void PrepareHitForVisualization(AnalysisResult res) throws Exception
 	{
 		String strOldGeneID = "";
@@ -3619,6 +3547,8 @@ public class SplicingWebApp extends Window
 			}
 		}
 	}
+	
+	/** Prepares the sample selection menu */
 	public void AddComboboxForSamples(Vlayout parentLayout)
 	{		
 		if(m_treeSelectedSamples == null && parentLayout != null)
@@ -3630,7 +3560,7 @@ public class SplicingWebApp extends Window
 			m_treeSelectedSamples.setId("sample_tree");
 			m_treeSelectedSamples.setParent(parentLayout);
 			m_treeSelectedSamples.setSizedByContent(true);
-			m_treeSelectedSamples.setHeight("470px");
+			m_treeSelectedSamples.setHeight("490px");
 			m_treeSelectedSamples.setWidth("280px");
 			m_treeSelectedSamples.setMultiple(true);
 			m_treeSelectedSamples.setCheckmark(true);
@@ -3856,6 +3786,7 @@ public class SplicingWebApp extends Window
 		}
 	}
 
+	/** Updates the sample selection menu */
 	private void UpdateComboboxForSampleSelection()
 	{
 		TreeMap<String, TreeSet<String>> mapSamplesToConditions = m_projectModel.GetSamplesPerCondition(m_strSelectedConditionType);
@@ -4022,6 +3953,8 @@ public class SplicingWebApp extends Window
 
 		UpdateColorSelection();
 	}
+	
+	/** Prepares the condition selection combo box */
 	public void AddComboboxesForCondition(Hlayout layoutH)
 	{
 		Vlayout layoutV = new Vlayout();
@@ -4084,6 +4017,7 @@ public class SplicingWebApp extends Window
 		}
 	}
 
+	/** Updates the condition selection combo box */
 	public void UpdateComboboxesForCondition()
 	{
 		m_comboboxSelectedCondition.getChildren().clear();
@@ -4100,6 +4034,7 @@ public class SplicingWebApp extends Window
 		}
 	}
 	
+	/** Prepares the isoform selection menu */
 	public void AddComboboxForIsoformSelection(Vlayout parentLayout) throws IOException
 	{
 		if(m_treeSelectedIsoforms == null)
@@ -4108,7 +4043,7 @@ public class SplicingWebApp extends Window
 			m_treeSelectedIsoforms.setId("isoform_tree");
 			m_treeSelectedIsoforms.setParent(parentLayout);
 			m_treeSelectedIsoforms.setWidth("400px");
-			m_treeSelectedIsoforms.setHeight("470px");
+			m_treeSelectedIsoforms.setHeight("490px");
 //			m_treeSelectedIsoforms.setAutopaging(true);
 			m_treeSelectedIsoforms.setMultiple(true);
 			m_treeSelectedIsoforms.setCheckmark(true);
@@ -4258,7 +4193,8 @@ public class SplicingWebApp extends Window
 			lblText.setParent(layoutH);
 		}
 	}
-	
+
+	/** Initializes the isoform combobox with data after a gene change */
 	public void InitComboboxForIsoformSelection()
 	{
 		m_treeSelectedIsoforms.invalidate();
@@ -4322,6 +4258,7 @@ public class SplicingWebApp extends Window
 		m_treeSelectedIsoforms.setSizedByContent(true);
 	}
 	
+	/** Helper function that is called by HideIrrelevantIsoforms (defined below) to use multi-threading to identify invalid isoforms*/
 	public TreeSet<String> RemoveIrrelevantIsoforms(String strCondition, int nMode, TreeSet<String> vcIrrelevantIsoforms, boolean bSkipFirstAndLastExon, boolean bDebug) throws IOException
 	{
 		// make a copy of the irrelevant isoform vector, because we do not want to change it directly
@@ -4360,10 +4297,10 @@ public class SplicingWebApp extends Window
 		return vcResult;
 	}
 
-	//########################################################################
-	//    Calculates the isoform expression value per sample
-	//    Returns a map of the form <isoform_id, <sample, coverage_value>>
-	//########################################################################
+	/**
+	 *    Invokes MMSeq to calculates the isoform expression value per sample 
+	 *    Returns a map of the form <isoform_id, <sample, coverage_value>>
+	 */
 	public void GenerateMMSeqEstimates() throws Exception
 	{
 		// check whether the executable is valid
@@ -4434,9 +4371,7 @@ public class SplicingWebApp extends Window
 
 		//#######################################
 		//           write hits data
-		//#######################################
-//		System.out.println(mapIsoformsToPositions);
-		
+		//#######################################		
 		// <Isoform, <Sample, Value>>
 		TreeMap<String, TreeMap<String, Double>> mapRelativeExpressionToIsoform = new TreeMap<String, TreeMap<String, Double>>();
 		
@@ -4544,9 +4479,7 @@ public class SplicingWebApp extends Window
 		m_projectModel.AddIsoformExpressionToDataBase(mapRelativeExpressionToIsoform, m_dataSupplier.GetGeneID(), m_strPathMMSeqResults);
 	}
 
-	//########################################################################
-	//                Calculates the sample size factors
-	//########################################################################
+	/** Calculates the sample size factors */
 	public boolean CalculateSizeFactors(String strFileGTF, String strFileProject) throws IOException
 	{
 		// init project
@@ -4685,6 +4618,7 @@ public class SplicingWebApp extends Window
 				nGenes += 1;
 			}
 		}
+		
 		for(int i=0; i<nSamples; i++)
 		{
 			double[] pVals = new double[nGenes];
@@ -4714,89 +4648,17 @@ public class SplicingWebApp extends Window
 		
 		return true;
 	}
-	
-	//##############################################################################################
-	//    selected isoforms are those isoforms that are actually drawn and used for calculations
-	//##############################################################################################
-	public void DetermineValidIsoforms() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException
-	{
-		//######################################################################
-		//    Remove isoforms that have are not compatible with the selected
-		//    exons from the list of available isoforms.
-		//    All isoforms must contain exon group A if it has been selected.
-		//######################################################################
-		if(m_ClickEvent.m_strClickedA != null)
-		{
-			if(m_ClickEvent.m_strClickedA.contains("exon_group"))
-			{
-				m_vcValidIsoforms.clear();
-				TreeMap<String, int[]> mapExonsToIsoforms = GetSelectedIsoforms();
-				
-				for(String strIsoform : mapExonsToIsoforms.keySet())
-					m_vcValidIsoforms.add(strIsoform);
-			}
-			else if(m_ClickEvent.m_strClickedA.contains("edge"))
-			{
-				String pSplitA[] = m_ClickEvent.m_strClickedA.split("_");
-				
-				int nClickedEdgeStart = Integer.parseInt(pSplitA[1])-1;
-				int nClickedEdgeEnd   = Integer.parseInt(pSplitA[2])-1;
-				
-				ExonGroup pExonGroups[] = m_dataSupplier.GetExonGroups();
-				String vcIsoforms[] 	= m_dataSupplier.GetIsoformNames();
-				
-				for(String strIsoform : vcIsoforms)
-				{						
-					Exon pExons[] = m_dataSupplier.GetExonsForIsoform(strIsoform);
-					
-					Vector<Integer> vcExonGroupIDs = new Vector<Integer>();
 
-					// get exon group for each exon
-					for(Exon ex : pExons)
-					{
-						for(ExonGroup grp : pExonGroups)
-						{
-							if(grp.groupContainsExon(ex.getExonID()))
-							{
-								vcExonGroupIDs.add(grp.getGroupID());
-								break;
-							}
-						}
-					}
-
-					for(int i=0; i<vcExonGroupIDs.size(); i++)
-					{
-						if(vcExonGroupIDs.get(i) == nClickedEdgeStart && vcExonGroupIDs.get(i+1) == nClickedEdgeEnd)
-						{
-							m_vcValidIsoforms.add(strIsoform);
-							break;
-						}
-					}
-
-				}
-			}
-		}
-		else
-		{
-			//##############################################
-			//       select all isoforms for the gene
-			//##############################################
-			m_vcValidIsoforms.clear();
-			for(Treeitem item : m_treeSelectedIsoforms.getSelectedItems())
-			{
-				m_vcValidIsoforms.add(item.getValue().toString());
-			}
-		}
-	}
-
-	//#############################################################################################
-	//    Hiding irrelevant isoforms is done in two steps:
-	//
-	//    First, isoforms containing exons that are not supported by junction reads are removed.
-	//
-	//    Second, the coverage for the exons of the remaining isoforms are calculate and
-	//    isoforms with too low coverage per base or coverage length are discarded.
-	//#############################################################################################
+	/**
+	 *    Identifies isoforms that do not pass the filter criteria and flags them as irrelevant.
+	 *     
+ 	 *    Hiding irrelevant isoforms is done in two steps:
+	 *
+	 *    First, isoforms containing exons that are not supported by junction reads are removed.
+	 *
+	 *    Second, the coverage for the exons of the remaining isoforms are calculate and
+	 *    isoforms with too low coverage per base or coverage length are discarded.
+	 */
 	public boolean HideIrrelevantIsoforms(boolean bSkipFirstAndLastExon, boolean bDebug) throws IOException
 	{
 		TreeMap<String, TreeSet<String>> mapSamplesToConditions = m_projectModel.GetSamplesPerCondition(m_strSelectedConditionType);
@@ -5012,12 +4874,15 @@ public class SplicingWebApp extends Window
 		return true;
 	}
 
-	// uses Benjamini-Hochberg multiple-testing correction to adjust p-values of PSI scores
+	/**
+	 *     Adjust PSI score p-values by Benjamini-Hochberg multiple-testing correction
+	 *     - This function would also fit else where better
+	 */
 	protected TreeSet<SimpleSpliceScore> AdjustPValuesPsiScores(TreeSet<SimpleSpliceScore> vcScores, Vector<Double> vcPValues)
 	{
 		int nTests = vcPValues.size();
 		
-		// sort p-values asdencing
+		// sort p-values ascendingly
 		Collections.sort(vcPValues);
 		
 		// find the last significant hit with highest p-value
@@ -5055,6 +4920,7 @@ public class SplicingWebApp extends Window
 		return vcScores;
 	}
 	
+	/** Sets the application parameters, which is only necessary for the console application. */
 	public void SetParameters(int nMinJunctionReads, int nMinCovPerBase, double fMinFracCoveredBases, double fMinRatio, int nThreads, String strFileXref, String strFileGTF, boolean bDetectIntronRetention)
 	{
 		m_nMinJunctionReads					= nMinJunctionReads;
@@ -5077,6 +4943,7 @@ public class SplicingWebApp extends Window
 			System.out.println(" - intron retention events will not be discovered.");
 	}
 
+	/** Loads the gene annotation file */
 	public void LoadGeneAnnotation(String strFile)
 	{
 		if(strFile.toLowerCase().endsWith(".gtf") || strFile.toLowerCase().endsWith(".gff"))
@@ -5086,13 +4953,13 @@ public class SplicingWebApp extends Window
 			File pFile = new File(strFileIdx);
 			
 			m_nReferenceType = GTF_REFERENCE_FILE;
-			System.out.println("GTF reference detected");
 
+			// check whether the file is accessible
 			if(m_gffReader == null || !m_gffReader.GetFileName().equals(m_strFileGTF))
 			{
-				// validate gene identifier
 				try
 				{
+					// set the GTF/GFF reader member variable
 					m_gffReader = new RandomAccessGFFReader(new File(m_strFileGTF), pFile);
 				}
 				catch(Exception e)
@@ -5103,8 +4970,9 @@ public class SplicingWebApp extends Window
 				}
 			}
 
+			// Now open the index file for the GTF file and collect all gene IDs
+			// Missing GTF index files are automatically generated by the RandomAccessGFFReader
 			Scanner pIn = null;
-			
 			try
 			{
 				pIn = new Scanner(pFile);
@@ -5124,41 +4992,23 @@ public class SplicingWebApp extends Window
 			}
 			pIn.close();
 			
+			// Now check which genes in the GTF are also included in the cross reference file that was used to generate the list of gene identifiers
 			for(GeneIdentifier gid : m_geneIdentifierHandler.GetAllGeneIdentifiers())
 			{
+				// valid gene identifiers require an ensembl or entrez gene ID
 				if(vcGeneIDs.contains(gid.m_strEnsemblGeneID) || vcGeneIDs.contains(gid.m_strEntrezGeneID))
 					gid.m_bIsValid = true;
 				else
 					gid.m_bIsValid = false;
 			}
 		}
-		else if(strFile.toLowerCase().endsWith(".refflat"))
+		else
 		{
-			/*
-			m_nReferenceType = REFFLAT_REFERENCE_FILE;
-			System.out.println("refflat reference detected");
-			
-			// validate gene identifier
-			Scanner pIn = new Scanner(new File(strFile));
-			TreeSet<String> vcGeneIDs = new TreeSet<String>();
-			while(pIn.hasNextLine())
-			{
-				String strLine = pIn.nextLine();
-				vcGeneIDs.add(strLine.split("\\s+")[1]);
-			}
-			pIn.close();
-
-			for(GeneIdentifier gid : m_geneIdentifierHandler.GetAllGeneIdentifiers())
-			{
-				if(vcGeneIDs.contains(gid.m_strRefGeneID))
-					gid.m_bIsValid = true;
-				else
-					gid.m_bIsValid = false;
-			}
-			*/
+			ErrorMessage.ShowError("ERROR: Only GTF files are supported.");
 		}
 	}
 
+	/** Retrieves the coverage for an exonic part from tissue specific data */
 	public TreeMap<String, TreeMap<String, Vector<Double>>> GetGTEXDataForExonicParts()
 	{
 		TreeMap<String, TreeMap<String, Vector<Double>>> mapCountsPerExonicPartAndTissue = new TreeMap<String, TreeMap<String, Vector<Double>>>();
@@ -5216,8 +5066,7 @@ public class SplicingWebApp extends Window
 						break;
 					}
 				}
-				
-//				if(pSplit[8].equals("gene_id \"" + strEntrezID +"\""))
+
 				if(bOkay)
 				{
 					while(true)
@@ -5250,7 +5099,7 @@ public class SplicingWebApp extends Window
 		File pFolder = new File(m_strPathToExonData);
 		if(!pFolder.exists())
 		{
-			Messagebox.show("ERROR: Invalid GTEX folder specified: " + m_strPathToExonData);
+			ErrorMessage.ShowError("ERROR: Invalid GTEX folder specified: " + m_strPathToExonData);
 			return null;
 		}
 		
@@ -5261,7 +5110,7 @@ public class SplicingWebApp extends Window
 			
 			if(!pFile.exists())
 			{
-				Messagebox.show("ERROR: No GTEX data available for exonic part: " + strGTEXID + " " + strPos + " " + mapIDsToPositions.get(strPos) + " -> " + strFile);
+				ErrorMessage.ShowError("ERROR: No GTEX data available for exonic part: " + strGTEXID + " " + strPos + " " + mapIDsToPositions.get(strPos) + " -> " + strFile);
 				continue;
 			}
 			
@@ -5309,287 +5158,8 @@ public class SplicingWebApp extends Window
 		
 		return mapCountsPerExonicPartAndTissue;
 	}	
-	Color getHeatMapColor(float value)
-	{
-		 // http://www.andrewnoske.com/wiki/Code_-_heatmaps_and_color_gradients
-		int NUM_COLORS = 4;
-		float color[][] = new float[NUM_COLORS][3]; // { {0,0,1}, {0,1,0}, {1,1,0}, {1,0,0} };
-		color[0][0] = 0;
-		color[0][1] = 0;
-		color[0][2] = 1;
-		
-		color[1][0] = 0;
-		color[1][1] = 1;
-		color[1][2] = 0;
-		
-		color[2][0] = 1;
-		color[2][1] = 1;
-		color[2][2] = 0;
-		
-		color[3][0] = 1;
-		color[3][1] = 0;
-		color[3][2] = 0;
-	    //A static array of 4 colors:  (blue,   green,  yellow,  red) using {r,g,b} for each.
-	 
-	    int idx1;        // |-- Our desired color will be between these two indexes in "color".
-	    int idx2;        // |
-	    float fractBetween = 0.0f;  // Fraction between "idx1" and "idx2" where our value is.
-	 
-	    if(value <= 0)
-	    {
-	    	idx1 = idx2 = 0;    // accounts for an input <=0
-	    }
-	    else if(value >= 1)
-	    {
-	    	idx1 = idx2 = NUM_COLORS-1;     // accounts for an input >=0
-	    }
-	    else
-	    {
-	    	value = value * (NUM_COLORS-1);        // Will multiply value by 3.
-	    	idx1  = (int)Math.floor(value);                  // Our desired color will be after this index.
-	    	idx2  = idx1+1;                        // ... and before this index (inclusive).
-	    	fractBetween = value - (float)idx1;    // Distance between the two indexes (0-1).
-	    }
-	 
-	    float red   = (color[idx2][0] - color[idx1][0])*fractBetween + color[idx1][0];
-	    float green = (color[idx2][1] - color[idx1][1])*fractBetween + color[idx1][1];
-	    float blue  = (color[idx2][2] - color[idx1][2])*fractBetween + color[idx1][2];
-	    
-	    Color clrRes = new Color(red, green, blue);
-	    return clrRes;
-	}
-
-	public TreeMap<ExonGroup, Double> CalculateVariableExonsOld() throws IOException
-	{
-		TreeMap<ExonGroup, Double> mapResult = new TreeMap<ExonGroup, Double>();
-		
-		TreeMap<String, String> mapBigWigFiles 	= m_projectModel.GetBigWigFilesForSamples();
-		
-		if(mapBigWigFiles == null)
-		{
-			Messagebox.show("ERROR: no valid bigwig or bam files detected");
-			return null;
-		}
-		
-		// get reference name
-		String strRef = m_dataSupplier.GetReferenceName();
-		
-		// get samples per condition
-		final TreeMap<String, TreeSet<String>> vcSamplesAndConditions = m_projectModel.GetSamplesPerCondition(m_strSelectedConditionType);
-		
-		//########################################
-		//      prepare coverage containers
-		//########################################
-		// key 1 = exon_name, key 2 = sample, value = coverage array
-		TreeMap<String, TreeMap<String, double[]>> mapCoverageToSamplesAndExons = new TreeMap<String, TreeMap<String, double[]>>();
-		for(ExonGroup grp : m_dataSupplier.GetExonGroups())
-		{			
-			int nStart	= grp.getGenomicStartOfGroup();
-			int nEnd	= grp.getGenomicStopOfGroup();
-			
-			String strName = strRef + ":" + nStart + "-" + nEnd;
-			
-			mapCoverageToSamplesAndExons.put(strName, new TreeMap<String, double[]>());
-		}
-		
-		//#####################################
-		//    obtain coverage for all exons 
-		//#####################################
-		for(String strCondition : vcSamplesAndConditions.keySet())
-		{
-			for(String strSample : vcSamplesAndConditions.get(strCondition))
-			{
-				if(!m_vcSelectedSamples.contains(strSample))
-					continue;
 	
-				for(ExonGroup grp : m_dataSupplier.GetExonGroups())
-				{
-					int nStart	= grp.getGenomicStartOfGroup();
-					int nEnd	= grp.getGenomicStopOfGroup();
-					String strGrpName = strRef + ":" + nStart + "-" + nEnd;
-					
-					double[] pCoverage = GetCoverageForExonGroup(grp, strSample, true);
-					
-					if(m_plotFactory.IsLog2Enabled())
-					{
-						for(int i=0; i<pCoverage.length; i++)
-						{
-//							pCoverage[i] = Math.Log2(pCoverage[i]+1);
-							pCoverage[i] = Math.log(pCoverage[i]+1) / Math.log(2);
-						}
-					}
-					
-					mapCoverageToSamplesAndExons.get(strGrpName).put(strSample, pCoverage);
-				}
-			}
-		}
-		
-		// prepare fraction map
-		TreeMap<String, TreeMap<ExonGroup, double[]>> mapCovFractionsPerExonGroupAndCondition = new TreeMap<String, TreeMap<ExonGroup, double[]>>();
-		
-		// get correct group coverage data
-		for(ExonGroup grp : m_dataSupplier.GetExonGroups())
-		{
-			String strName = strRef + ":" + grp.getGenomicStartOfGroup() + "-" + grp.getGenomicStopOfGroup();
-			TreeMap<String, double[]> mapData = mapCoverageToSamplesAndExons.get(strName);
-			
-			// key = condition, value = coverage per position for each sample
-			TreeMap<String, double[][]> mapCoveragePerSamplePerCondition = new TreeMap<String, double[][]>();
-	
-			for(String strCondition : vcSamplesAndConditions.keySet())
-			{
-				int nValidSamples = 0;
-				for(String strSample : vcSamplesAndConditions.get(strCondition))
-				{
-					if(m_vcSelectedSamples.contains(strSample))
-						nValidSamples += 1;
-				}
-
-				if(nValidSamples > 0)
-				{
-					double[][] pValues =  new double[grp.getExonGroupLengthInBp()+1][nValidSamples];
-					
-					int nCurrentSample = 0;
-					for(String strSample : vcSamplesAndConditions.get(strCondition))
-					{
-						if(!m_vcSelectedSamples.contains(strSample))
-							continue;
-						
-						double pData[] =  mapData.get(strSample);						
-						for(int x=0; x<pData.length; x++)
-						{
-							double fValue = pData[x];
-							pValues[x][nCurrentSample] = fValue;
-						}
-						
-						nCurrentSample += 1;
-					}
-					
-					if(nCurrentSample != 0)
-						mapCoveragePerSamplePerCondition.put(strCondition, pValues);
-				}
-			}
-			
-			TreeMap<String, double[]> mapFractionsToCondition = new TreeMap<String, double[]>();
-			for(int x=0; x<grp.getExonGroupLengthInBp(); x++)
-			{
-				// get median coverage for all conditions
-				TreeMap<String, Double> mapMedianCoverageToCondition = new TreeMap<String, Double>();
-				
-				// get coverage sum
-				double fTotalCoverage = 0;
-	
-				for(String strCondition : mapCoveragePerSamplePerCondition.keySet())
-				{
-					double pValues[][] = mapCoveragePerSamplePerCondition.get(strCondition);					
-					double pCov[] = new double[pValues[0].length];
-					
-					for(int nSample = 0; nSample<pValues[0].length; nSample++)
-					{
-						pCov[nSample] = pValues[x][nSample]; 
-					}
-	
-					double fMedian = StatUtils.percentile(pCov, 50.0);
-					mapMedianCoverageToCondition.put(strCondition, fMedian);
-					fTotalCoverage += fMedian;
-				}
-				
-				if(fTotalCoverage == 0)
-					continue;
-	
-				// calculate contribution of each condition to the coverage
-				for(String strCondition : mapMedianCoverageToCondition.keySet())
-				{
-					double fFraction = mapMedianCoverageToCondition.get(strCondition) / fTotalCoverage;
-					
-					if(mapFractionsToCondition.containsKey(strCondition))
-					{
-						double[] pFractions = mapFractionsToCondition.get(strCondition);
-						pFractions[x] = fFraction;
-					}
-					else
-					{
-						double[] pFractions = new double[grp.getExonGroupLengthInBp()];
-						pFractions[x] = fFraction;
-						mapFractionsToCondition.put(strCondition, pFractions);
-					}
-				}
-			}
-			
-			for(String strCondition : mapFractionsToCondition.keySet())
-			{
-				if(mapCovFractionsPerExonGroupAndCondition.containsKey(strCondition))
-				{
-					TreeMap<ExonGroup, double[]> mapFractionsToExonGroup = mapCovFractionsPerExonGroupAndCondition.get(strCondition);
-					mapFractionsToExonGroup.put(grp, mapFractionsToCondition.get(strCondition));
-					
-//					System.out.println(grp + " -> " +  Arrays.toString(mapFractionsToCondition.get(strCondition)));
-				}
-				else
-				{
-					TreeMap<ExonGroup, double[]> mapFractionsToExonGroup = new TreeMap<ExonGroup, double[]>();
-					mapFractionsToExonGroup.put(grp, mapFractionsToCondition.get(strCondition));
-					
-					mapCovFractionsPerExonGroupAndCondition.put(strCondition, mapFractionsToExonGroup);
-					
-//					System.out.println(grp + " -> " +  Arrays.toString(mapFractionsToCondition.get(strCondition)));
-				}
-			}
-		}
-		
-		// perform test for each exon group to identify alternatively spliced exons
-		for(String strCondition : mapCovFractionsPerExonGroupAndCondition.keySet())
-		{
-			for(ExonGroup grp1 : mapCovFractionsPerExonGroupAndCondition.get(strCondition).keySet())
-			{
-				double[] pFractionsGroup1 = mapCovFractionsPerExonGroupAndCondition.get(strCondition).get(grp1);
-				double fMedianGroup1 = StatUtils.percentile(pFractionsGroup1, 50.0);
-				
-//				System.out.println(grp1 + " 1-> " +  Arrays.toString(mapCovFractionsPerExonGroupAndCondition.get(strCondition).get(grp1)));
-
-				// get average coverage ratio for all other exons
-				Vector<Double> vcAllGroups = new Vector<Double>();
-				for(ExonGroup grp2 : mapCovFractionsPerExonGroupAndCondition.get(strCondition).keySet())
-				{					
-					if(grp1.getGroupID() != grp2.getGroupID())
-					{
-//						System.out.println(grp2 + " 2-> " +  Arrays.toString(mapCovFractionsPerExonGroupAndCondition.get(strCondition).get(grp2)));
-						
-						double fFractionsGroup2[] = mapCovFractionsPerExonGroupAndCondition.get(strCondition).get(grp2);
-						vcAllGroups.add(StatUtils.mean(fFractionsGroup2));
-					}
-				}
-				double pAllGroups[] = new double[vcAllGroups.size()];
-				for(int i=0; i<vcAllGroups.size(); i++)
-					pAllGroups[i] = vcAllGroups.get(i);
-				
-//				double fMeanAll  = StatUtils.mean(pAllGroups);		
-				double fMedianAll  = StatUtils.percentile(pAllGroups, 50);
-				
-				double fRes = Math.abs(fMedianGroup1 - fMedianAll);
-				if(fRes > m_fVariableExonThreshold)
-				{				
-					if(mapResult.containsKey(grp1))
-					{
-						if(fRes > mapResult.get(grp1))
-							mapResult.put(grp1, fRes);
-					}
-					else
-					{
-						mapResult.put(grp1, fRes);
-					}
-//					System.out.println(strCondition + " " + grp1.getGenomicStartOfGroup() + "-" + grp1.getGenomicStopOfGroup() + " is significantly different" );
-				}
-				
-//				System.out.println("grp: " + fMeanGrp1);
-//				System.out.println("all: " + fMeanAll);
-//				System.out.println(strCondition + " " + grp1.getGenomicStartOfGroup() + "-" + grp1.getGenomicStopOfGroup() + " " + ((fMeanGrp1-fMeanAll)/fMeanAll));
-			}
-		}
-		
-		return mapResult;
-	}
-	
+	/** Limits the number of initially selected samples for large projects (>50 samples) */
 	public void ReduceSampleSize()
 	{
 		int nMaxTotalSamples = 50;
@@ -5689,6 +5259,10 @@ public class SplicingWebApp extends Window
 		UpdateComboboxForSampleSelection();
 	}
 
+	/**
+	 *    Helper function that opens a project file.
+	 *    - only invoked by the console application (AnalyzerGeneFactory)
+	 */
 	public void InitProjectModel(String strFileProject)
 	{
 		try
@@ -5702,12 +5276,20 @@ public class SplicingWebApp extends Window
 		}
 	}
 
+	/**
+	 *    Saves the list of 'permanent' alterantive splicing events to a file.
+	 *    - Called by pressing the "Save changes" button located below the result list
+	 */
 	public void SaveSplicingResults()
 	{
 		String strResultFile = m_projectModel.GetProjectName() + "_splicing_results.dat";
 		m_vcASResults.SaveToFile(m_strPathHitLists, strResultFile);
 	}
 	
+	/**
+	 *    Writes the size in bytes to the output file and then adds the binary data
+	 *    or, if there is no data to be written, adds a byte size of 0 to the output file
+	 */
 	public static final void WriteStringToFileOutputStream(String strOutputString, FileOutputStream pOut) throws IOException
 	{
 		if(!strOutputString.isEmpty())
@@ -5731,6 +5313,10 @@ public class SplicingWebApp extends Window
 		}
 	}
 	
+	/**
+	 *    Reads data from a binary file. First, the length of the data is read to reserve sufficient memory, then the data is read to a buffer
+	 *    and converted to a UTF-8 string. If the data has a length of 0 bytes an empty string is returned.
+	 */
 	public static final String ReadStringFromFileInputStream(FileInputStream pIn) throws IOException
 	{
 		byte pIntBuffer[] = new byte[Integer.BYTES];

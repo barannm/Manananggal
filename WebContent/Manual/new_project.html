@@ -4,7 +4,7 @@
 
 <body>
 	<div class="title_div">
-	<h1 class="title blood">Manananggal – Userguide</h1>
+	<h1 class="title">Manananggal – Userguide</h1>
 
 	<!-- SECTIONS -->
 	<nav class="nav_effect">
@@ -51,6 +51,16 @@
 				</ul>
 			</li>
 			<li><a href="./interpreting_results.html">Interpreting results</a></li>
+			<li><a href="./tutorial.html">Tutorial</a>
+			  <ul>
+			  	<li><a href="./tutorial.html#preamble">Preamble</a></li>
+			  	<li><a href="./tutorial.html#data_selection">Data Loading</a></li>
+				<li><a href="./tutorial.html#isoform_selection">Isoform Choice</a></li>
+				<li><a href="./tutorial.html#result_list">Result List</a></li>
+				<li><a href="./tutorial.html#alt_start">Example 2</a></li>
+				<li><a href="./tutorial.html#exon_extension">Example 3</a></li>
+			  </ul>
+			</li>
 		</ul>
 	</nav>
 	</div>
@@ -90,8 +100,10 @@
 				<p>Manananggal can generate junction spanning read count files, but you can also generate your own. The following bash command shows how to generate counts using Manananggal.</p>
 				
 				<div class=div_code>
-					<p>java -cp /Manananggal/lib/*:/Manananggal.jar Manananggal.SplicingAnalyzer prepare_counts $reference $fileIn $fileOut -lenient</p>
+					<p>java -cp /Manananggal/lib/*:/Manananggal.jar Manananggal.SplicingAnalyzer prepare_counts $reference $fileIn $fileOut [-lenient]</p>
 				</div>
+				<p>It might be necessary to use the optional -lenient parameter if the mapper you are using produces bam files with incorrectly set flags (e.g. reads that)
+				should be singletons but were flagged as paired). Other than that you could also try to correct the flags using other tools (e.g. PICARD).</p>
 				<p>The reference file must be a <font style="color: hsl(100,100%,50%)">GTF</font> file and the input file must be a <font style="color: hsl(100,100%,50%)">.bam</font>.
 				The output file has the following format:</p>
 				<div class=table>
@@ -156,6 +168,47 @@
 						<div class=cell>0</div>
 					</div>
 				</div>
+				<br>
+				<p>Alternatively, a 6+1 column bed file may be used.</p>
+				<div class=table>
+					<div class="row header">
+						<div class=cell>reference</div>
+						<div class=cell>start</div>
+						<div class=cell>end</div>
+						<div class=cell>gene_id</div>
+						<div class=cell>count</div>
+						<div class=cell>strand</div>
+						<div class=cell>[is_known]</div>
+					</div>
+					<div class=row>
+						<div class=cell>chr1</div>
+						<div class=cell>12536</div>
+						<div class=cell>13632</div>
+						<div class=cell>ENSG0000000001.1</div>
+						<div class=cell>5</div>
+						<div class=cell>+</div>
+						<div class=cell>true</div>
+					</div>
+					<div class=row>
+						<div class=cell>chr1</div>
+						<div class=cell>41662</div>
+						<div class=cell>42354</div>
+						<div class=cell>ENSG0000000001.1</div>
+						<div class=cell>12</div>
+						<div class=cell>+</div>
+						<div class=cell>false</div>
+					</div>
+					<div class=row>
+						<div class=cell>chr1</div>
+						<div class=cell>81058</div>
+						<div class=cell>82547</div>
+						<div class=cell>ENSG0000000001.1</div>
+						<div class=cell>56</div>
+						<div class=cell>+</div>
+						<div class=cell>true</div>
+					</div>
+				</div>				
+				<p>Please note that the 7th column is not a standard BED column and thus optional. It specifies whether a junction is known (=true) or novel (=false). We recommend to add this information.</p>
 			</div>
 		</section>
 		
@@ -163,7 +216,7 @@
 		<section class=mysection>
 			<header><h1>Preparing the project file</h1></header>
 			<div class=mydiv>
-				<p>The project file includes defines which bigwig and count files belongs to which sample. Some headers in this file are mandatory, while all other headers are used for sample grouping.
+				<p>The project file defines which bigwig and count file belongs to which sample. Some headers in this file are mandatory, while all other headers are used for sample grouping.
 				Shown below is an example of a project file that groups samples by condition and tissue type.</p>
 				
 				<div class=div_code>

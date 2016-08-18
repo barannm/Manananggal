@@ -19,13 +19,17 @@ package Manananggal;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.TreeSet;
 
 import BioKit.Exon;
 import BioKit.Gene;
 
+/**
+ *    This class stores all values that are associated with
+ *    a PSI score result (e.g. the inclusion and exclusion
+ *    junction and p-value).
+ */
 public class SimpleSpliceScore implements Comparable<SimpleSpliceScore>
 {
 	String			m_strGeneID;
@@ -137,104 +141,35 @@ public class SimpleSpliceScore implements Comparable<SimpleSpliceScore>
 		return strOut;
 	}
 	
-	public void GetValidIsoforms(Gene gene)
+	/** 
+	 *    Checks whether the result includes any unannotated junctions and,
+	 *    thus, is referring to a novel splicing event
+	 */
+	public void CheckIfNovel(Gene gene)
 	{
 		boolean bInclusionKnown = false;
 		boolean bExclusionKnown = false;
 		for(String strIsoform : gene.getArrayOfGeneProductNames())
 		{
 			TreeSet<String> strJunctions = gene.getSpliceJunctionInformationForGeneProduct(strIsoform);
-
-//			boolean bIncludesInclusionJunction = false;
-//			boolean bIncludesExclusionJunction = false;
 			
 			if(strJunctions.contains(m_JunctionInclusion.m_nStart + "-" + m_JunctionInclusion.m_nEnd))
 			{
-//				bIncludesInclusionJunction 	= true;
 				bInclusionKnown				= true;
 			}
 			
 			if(strJunctions.contains(m_JunctionExclusion.m_nStart + "-" + m_JunctionExclusion.m_nEnd))
 			{
-//				bIncludesExclusionJunction	= true;
 				bExclusionKnown				= true;
 			}
-			
-			/*
-			if(bIncludesInclusionJunction || bIncludesExclusionJunction)
-			{
-				m_vcValidIsoforms.add(strIsoform.split("\\.")[0]);
-			}
-			*/
 		}
 		
+		// if either junction is novel, the result is novel
 		if(!bInclusionKnown || !bExclusionKnown)
 			m_bIsNovel = true;
 	}
 	
-	public void WriteToFile(RandomAccessFile pOut)
-	{
-		try
-		{
-			pOut.writeUTF(m_strGeneID);
-			pOut.writeUTF(m_strID);
-			pOut.writeBoolean(m_bIsNovel);
-
-			pOut.writeInt(m_nType);
-			
-			pOut.writeInt(m_JunctionInclusion.m_nStart);
-			pOut.writeInt(m_JunctionInclusion.m_nEnd);
-			
-			pOut.writeInt(m_JunctionExclusion.m_nStart);
-			pOut.writeInt(m_JunctionExclusion.m_nEnd);
-			
-			pOut.writeDouble(m_fPValue);
-			pOut.writeBoolean(m_bSignificant);
-			pOut.writeDouble(m_fInclusionChange);
-			
-			pOut.writeUTF(m_strConditionA);
-			pOut.writeUTF(m_strConditionB);
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-		}
-	}
-	
-	public boolean ReadFromFile(RandomAccessFile pIn)
-	{	
-		try
-		{
-			m_strGeneID 		= pIn.readUTF();
-			m_strID				= pIn.readUTF();
-			m_bIsNovel			= pIn.readBoolean();
-
-			m_nType				= pIn.readInt();
-			
-			m_JunctionInclusion = new CountElement();
-			m_JunctionInclusion.m_nStart = pIn.readInt();
-			m_JunctionInclusion.m_nEnd	 = pIn.readInt();
-			
-			m_JunctionExclusion = new CountElement();
-			m_JunctionExclusion.m_nStart = pIn.readInt();
-			m_JunctionExclusion.m_nEnd	 = pIn.readInt();
-			
-			m_fPValue			= pIn.readDouble();
-			m_bSignificant		= pIn.readBoolean();
-			m_fInclusionChange	= pIn.readDouble();
-			m_strConditionA	 	= pIn.readUTF();
-			m_strConditionB		= pIn.readUTF();
-			
-			m_strID = m_JunctionInclusion.m_nStart + "_" + m_JunctionInclusion.m_nEnd + "_" + m_JunctionExclusion.m_nStart + "_" + m_JunctionExclusion.m_nEnd + "_" + m_strConditionA + "_" + m_strConditionB + "_" + m_bIsNovel + "_" + m_nType;
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-			return false;
-		}
-		return true;
-	}
-
+	/** Writes the score to a binary output file */
 	public void WriteToFile(FileOutputStream pOut) throws IOException
 	{
 		SplicingWebApp.WriteStringToFileOutputStream(m_strID, pOut);
@@ -261,6 +196,7 @@ public class SimpleSpliceScore implements Comparable<SimpleSpliceScore>
 		pOut.write(bb.array());
 	}
 	
+	/** Reads the score from a binary input file */
 	public void ReadFromFile(FileInputStream pIn) throws IOException
 	{
 		m_strID 		= SplicingWebApp.ReadStringFromFileInputStream(pIn);
@@ -293,6 +229,7 @@ public class SimpleSpliceScore implements Comparable<SimpleSpliceScore>
 			m_bSignificant = true; 
 	}
 	
+	/** Returns whether a given exon is linked to the splicing event */
 	public boolean AffectsExon(Exon ex)
 	{
 		if((m_JunctionInclusion.m_nEnd == ex.getCodingStart() || m_JunctionInclusion.m_nStart == ex.getCodingStop()) && m_JunctionExclusion.m_nStart < ex.getCodingStart() && m_JunctionExclusion.m_nEnd > ex.getCodingStop() )
@@ -301,6 +238,7 @@ public class SimpleSpliceScore implements Comparable<SimpleSpliceScore>
 		return false;
 	}
 	
+	/** Returns whether a given exon (defined by start and end position) is linked to the splicing event */
 	public boolean AffectsExon(int nExStart, int nExEnd)
 	{
 		if((m_JunctionInclusion.m_nEnd == nExStart || m_JunctionInclusion.m_nStart == nExEnd) && m_JunctionExclusion.m_nStart < nExStart && m_JunctionExclusion.m_nEnd > nExEnd)

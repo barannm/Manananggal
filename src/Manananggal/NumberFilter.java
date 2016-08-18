@@ -16,6 +16,9 @@
  */
 package Manananggal;
 
+/**
+ *    Helper class used to add filters to the AS result list.
+ */
 public class NumberFilter
 {
 	private float m_fMinValue;

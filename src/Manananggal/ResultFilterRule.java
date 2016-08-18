@@ -16,8 +16,16 @@
  */
 package Manananggal;
 
+/** 
+ *    Helper class to define the filter rules for the columns in the result list.
+ *    It is used as member of the ResultListHandler class.
+ *    For each column it stores a filter that is either a text filter or number
+ *    filter. Further, it stores which values are visible from the categorical
+ *    columns such as the antisense type. 
+ */
 public class ResultFilterRule
 {	
+	// define the result filter IDs
 	static final int FILTER_TYPE_CONDITION_A 		= 0;
 	static final int FILTER_TYPE_CONDITION_B 		= 1;
 	static final int FILTER_TYPE_SIGNIFICANT_PSI	= 2;
@@ -32,6 +40,7 @@ public class ResultFilterRule
 	static final int FILTER_TYPE_P_VALUE_PSI		= 5;
 	private static final int MAX_NUMBER_FILTERS		= 6;
 
+	// arrays that store the filters
 	private boolean 		m_bShowASTypes[];
 	private boolean 		m_bShowResultType[];
 	private TextFilter[] 	m_pTextFilters;
@@ -57,59 +66,70 @@ public class ResultFilterRule
 		}
 	}
 	
+	/** Adds a text filter to the column specified by filter ID */
 	public void SetTextFilter(int nFilterID, TextFilter filter)
 	{
 		m_pTextFilters[nFilterID] = filter;
 	}
 	
+	/** Returns the textfilter associated with the column specified by filter ID a*/
 	public TextFilter GetTextFilter(int nFilterID)
 	{
 		return m_pTextFilters[nFilterID];
 	}
 	
+	/** Adds a number filter to the column specified by filter ID*/
 	public void SetNumberFilter(int nFilterID, NumberFilter filter)
 	{
 		m_pNumberFilters[nFilterID] = filter;
 	}
 	
+	/** Returns the number filter associated with the column specified by filter ID*/
 	public NumberFilter GetNumberFilter(int nFilterID)
 	{
 		return m_pNumberFilters[nFilterID];
 	}
 	
-	//#############################################
+	/** Makes splicing events of the given splicing type visible */
 	public void ShowASType(int nSplicingType)
 	{
 		m_bShowASTypes[nSplicingType] = true;
 	}
 	
+	/** Hides splicing events of the given splicing type */
 	public void HideASType(int nSplicingType)
 	{
 		m_bShowASTypes[nSplicingType] = false;
 	}
 	
+	/** Returns whether splicing events of a certain type are visible */
 	public boolean IsShowingASType(int nSplicingType)
 	{
 		return m_bShowASTypes[nSplicingType];
 	}
 	
-	//#############################################
+	/** Makes results of the given result type visible */
 	public void ShowResultType(int nResultType)
 	{
 		m_bShowResultType[nResultType] = true;
 	}
 	
+	/** Hides results of the specified result type */
 	public void HideResultType(int nResultType)
 	{
 		m_bShowResultType[nResultType] = false;
 	}
 	
+	/** Returns whether results of a certain type are visible*/
 	public boolean IsShowingResultType(int nResultType)
 	{
 		return m_bShowResultType[nResultType];
 	}
 	
-	//#############################################
+	/** 
+	 *    Returns whether the result is a valid (visible) result based on all
+	 *    filter rules specified.
+	 */
 	public boolean bIsValidResult(AnalysisResult result)
 	{
 		if(!IsShowingASType(result.GetType()))

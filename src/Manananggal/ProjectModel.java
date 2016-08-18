@@ -38,12 +38,19 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.math3.stat.StatUtils;
-import org.zkoss.zul.Messagebox;
 
-import BioKit.Exon;
-import BioKit.Gene;
-
+/**
+ *    The ProjectModel holds all project specific informations, such as
+ *    the location of the project file, bigwig files and junction
+ *    count files.
+ *    
+ *    It also checks if all the specified data is actually accessible and
+ *    whether the data includes paired data.
+ *    
+ *    Includes functions that save AS events and MMSEQ results to hard disk
+ *    and generate merged binary junction count tables.
+ *    
+ */
 public class ProjectModel implements Comparable<ProjectModel>
 {	
 	private String m_strProjectFilePath;
@@ -112,6 +119,15 @@ public class ProjectModel implements Comparable<ProjectModel>
 		m_vcSamples.clear();
 	}
 	
+	/**
+	 *    Reads the .project file and stores the file locations.
+	 *    Also ensures that valid size factors were added to the
+	 *    project file and checks the accessibility of the files.
+	 *    
+	 *    Junction counts are read from a merged binary file.
+	 *    If this file cannot be found, the program will attempt
+	 *    to generate it from the plain text count files.
+	 */
 	public boolean Init(String strProjectFile, int nMergingJunctions_minSamples, int nMergingJunctions_minSampleCoverage, double fMergingJunctions_MinAverageCount, int nMergingJunctions_minCoverageSingleSample, boolean bLoadJunctionCounts) throws IOException
 	{	
 		m_mapConditonsToConditionTypes.clear();
@@ -212,14 +228,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 							File pFile = new File(sample.m_strBigWigFile);
 							if(!pFile.exists())
 							{
-								try
-								{
-									Messagebox.show("Missing file specified in project file: " + sample.m_strBigWigFile);
-								}
-								catch(Exception e)
-								{
-									System.out.println("Missing file specified in project file: " + sample.m_strBigWigFile);
-								}
+								ErrorMessage.ShowError("Missing file specified in project file: " + sample.m_strBigWigFile);
 								return false;
 							}
 						}
@@ -233,8 +242,28 @@ public class ProjectModel implements Comparable<ProjectModel>
 					case "size_factors":
 					{
 						String strNumber = pSplit[mapColumns.get(strColumn)].trim();
-						if(!strNumber.isEmpty())
+						try
+						{
 							sample.m_fSizeFactor = Double.parseDouble(strNumber);
+							if(Double.isNaN(sample.m_fSizeFactor))
+							{
+								// only fail if a complete project load was requested
+								if(bLoadJunctionCounts)
+								{
+									ErrorMessage.ShowError("Invalid size factor for sample: " + sample.m_strName);
+									return false;
+								}
+							}
+						}
+						catch(Exception e)
+						{
+							// only fail if a complete project load was requested
+							if(bLoadJunctionCounts)
+							{
+								ErrorMessage.ShowError("Invalid size factor for sample: " + sample.m_strName);
+								return false;
+							}
+						}
 						break;
 					}
 					default:
@@ -295,17 +324,9 @@ public class ProjectModel implements Comparable<ProjectModel>
 				File pFile = new File(sample.m_strJunctionFile);
 				if(!pFile.exists() && !bMergedFileExists)
 				{
-					try
-					{
-						Messagebox.show("Missing file specified in project file: " + sample.m_strJunctionFile);
-						return false;
-					}
-					catch(Exception e)
-					{
-						System.out.println("Missing file specified in project file: " + sample.m_strJunctionFile);
-						pScanner.close();
-						return false;
-					}					
+					ErrorMessage.ShowError("Missing file specified in project file: " + sample.m_strJunctionFile);
+					pScanner.close();
+					return false;			
 				}
 			}
 			
@@ -361,8 +382,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 				// if the file still does not exist, we got a problem
 				if(!pFile.exists())
 				{
-					Messagebox.show("Failed to get junction count table");
-					System.out.println("Failed to get junction count table");
+					ErrorMessage.ShowError("Failed to get junction count table: " + strMergedJunctionCountFile);
 					pScanner.close();
 					return false;
 				}
@@ -414,6 +434,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		return m_strProjectFilePath + "/" + this.m_strProjectName; 
 	}
 	
+	/** Merges the plain text count files into a large binary count file that is indexed for random access */
 	public void MergeJunctionTable(String strCondition, String strConditionType, String strMergedFile, int nMergingJunctions_minSamples, int nMergingJunctions_minSampleCoverage, double fMergingJunctions_MinAverageCount, int nMergingJunctions_minCoverageSingleSample) throws IOException
 	{		
 		TreeMap<CountElement, int[]> mapCounts = new TreeMap<CountElement, int[]>();
@@ -447,7 +468,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		
 		// get list of valid samples
 		TreeSet<String> vcValidSamples = new TreeSet<String>();	
-		TreeSet<String> vcSamples = GetSamplesPerCondition(strConditionType).get(strCondition);
+		TreeSet<String> vcSamples = GetSamplesPerCondition(strConditionType).get(strCondition);		
 		
 		System.out.println("merging junction counts for " + vcSamples.size() + " samples.");
 		
@@ -720,6 +741,11 @@ public class ProjectModel implements Comparable<ProjectModel>
 		return mapSizeFactorsToSamples;
 	}
 	
+	/**
+	 *    Replaces the size factor values in the 'size_factors' column of the .project file.
+	 *    A new column is added to the .project file if it does not contain a column named
+	 *    'size_factors'.
+	 */
 	public void WriteSizeFactors() throws FileNotFoundException
 	{
 		File pIn = new File(m_strProjectFilePath + "/" + m_strProjectName);
@@ -818,59 +844,8 @@ public class ProjectModel implements Comparable<ProjectModel>
 		
 		return mapBigWigFilesToSamples;
 	}
-
-	public TreeMap<String, TreeMap<String, Integer>> GetJunctionCountsForGene(Gene gene) throws IOException
-	{
-		TreeSet<String> vcConditions = m_mapConditonsToConditionTypes.get(m_mapConditonsToConditionTypes.firstKey());
-		
-		TreeMap<String, TreeMap<String, Integer>> mapRes = new TreeMap<String, TreeMap<String, Integer>>(); 
-		
-		for(String strCondition : vcConditions)
-		{
-			TreeMap<String, TreeMap<String, Integer>> mapTmp = m_mapJunctionReader.get(strCondition).GetJunctionsForGene(gene);
-			
-			for(String strJunction : mapTmp.keySet())
-			{
-				if(mapRes.containsKey(strJunction))
-				{
-					mapRes.get(strJunction).putAll(mapTmp.get(strJunction));
-				}
-				else
-				{
-					mapRes.put(strJunction, mapTmp.get(strJunction));
-				}
-			}
-		}
-		
-		return(mapRes);
-	}
 	
-	public TreeMap<String, TreeMap<String, Integer>> GetJunctionsForRange(String strRef, int nStart, int nEnd) throws IOException
-	{
-		TreeSet<String> vcConditions = m_mapConditonsToConditionTypes.get(m_mapConditonsToConditionTypes.firstKey());
-		
-		TreeMap<String, TreeMap<String, Integer>> mapRes = new TreeMap<String, TreeMap<String, Integer>>(); 
-		
-		for(String strCondition : vcConditions)
-		{
-			TreeMap<String, TreeMap<String, Integer>> mapTmp = m_mapJunctionReader.get(strCondition).GetJunctionsForRange(strRef, nStart, nEnd, 0);
-			
-			for(String strJunction : mapTmp.keySet())
-			{
-				if(mapRes.containsKey(strJunction))
-				{
-					mapRes.get(strJunction).putAll(mapTmp.get(strJunction));
-				}
-				else
-				{
-					mapRes.put(strJunction, mapTmp.get(strJunction));
-				}
-			}
-		}
-		
-		return(mapRes);
-	}
-	
+	/** Retrieves all junction counts in the specified region from the binary count file */
 	public TreeMap<CountElement, TreeMap<String, Integer>> GetJunctionsForRangeAsCountElements(String strRef, int nStart, int nEnd) throws IOException
 	{
 		TreeSet<String> vcConditions = m_mapConditonsToConditionTypes.get(m_mapConditonsToConditionTypes.firstKey());
@@ -896,78 +871,8 @@ public class ProjectModel implements Comparable<ProjectModel>
 
 		return(mapRes);
 	}
-	
-	// returns a junction tree with all junctions and exons connecting the given range
-	public JunctionTree GetJunctionsForRangeAsTree(Exon[] pExons, String strRef, int nStart, int nEnd, int nMinJunCoverage, String strConditionType) throws IOException
-	{
-		TreeMap<String, TreeSet<String>> mapSamplesToConditions = GetSamplesPerCondition(strConditionType);
-		
-		// first of all, get all junctions in the range		
-		TreeMap<CountElement, TreeMap<String, Integer>> mapJunctionCounts = new TreeMap<CountElement, TreeMap<String, Integer>>();
-		
-		for(String strCondition : mapSamplesToConditions.keySet())
-		{
-			TreeMap<CountElement, TreeMap<String, Integer>> mapTmp = m_mapJunctionReader.get(strCondition).GetJunctionsForRangeAsCountElements(strRef, nStart, nEnd, 0);
-			
-			for(CountElement junction : mapTmp.keySet())
-			{
-				if(mapJunctionCounts.containsKey(junction))
-				{
-					mapJunctionCounts.get(junction).putAll(mapTmp.get(junction));
-				}
-				else
-				{
-					mapJunctionCounts.put(junction, mapTmp.get(junction));
-				}
-			}
-		}
-		
-		//##################### prepare coverage array ################
-		//TODO valid samples
-		TreeMap<String, double[]> mapCoverageToConditions = new TreeMap<String, double[]>();
-		for(String strCondition : mapSamplesToConditions.keySet())
-		{
-			int nSamples = mapSamplesToConditions.get(strCondition).size();
-			mapCoverageToConditions.put(strCondition, new double[nSamples]);
-		}
 
-		// find invalid junctions
-		TreeSet<CountElement> vcInvalidJunctions = new TreeSet<CountElement>();
-		for(CountElement jun : mapJunctionCounts.keySet())
-		{
-			int nInvalid = 0;
-			for(String strCondition : mapSamplesToConditions.keySet())
-			{							
-				int nSampleIdx = 0;
-				for(String strSample : mapSamplesToConditions.get(strCondition))
-				{
-					mapCoverageToConditions.get(strCondition)[nSampleIdx] = mapJunctionCounts.get(jun).get(strSample);			
-					nSampleIdx++;
-				}
-				double fMean = StatUtils.mean(mapCoverageToConditions.get(strCondition));
-				
-				if(fMean < nMinJunCoverage)
-					nInvalid++;
-			}
-			
-			if(nInvalid == mapSamplesToConditions.size())
-			{
-//				System.out.println("invalid junction: " + jun + " " + mapJunctionCounts.get(jun));
-				vcInvalidJunctions.add(jun);
-			}
-		}
-		
-		for(CountElement jun : vcInvalidJunctions)
-		{
-			mapJunctionCounts.remove(jun);
-		}
-		
-		// now combine the exons and junction counts to one tree
-		JunctionTree junctionTree = new JunctionTree(mapJunctionCounts, pExons);
-		
-		return junctionTree;
-	}
-
+	/** Retrieves the isoform expression estimates for the current gene that were generated by MMSEQ */
 	public TreeMap<String, TreeMap<String, Double>> GetIsoformExpressions(String strGene, String strOutputPath) throws IOException
 	{
 		// <isoform, <sample, value>>
@@ -1050,6 +955,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		return mapExpressions;
 	}
 
+	/** Adds the MMSEQ expression estimates to a project specific output file*/
 	public void AddIsoformExpressionToDataBase(TreeMap<String, TreeMap<String, Double>> mapIsoformExpression, String strGeneID, String strOutputPath) throws IOException
 	{
 		RandomAccessFile pOutData = null;
@@ -1123,165 +1029,6 @@ public class ProjectModel implements Comparable<ProjectModel>
 		pOutData.close();
 		pOutIdx.close();
 	}
-	
-	public void AddHitToHitList(int nRating, GeneIdentifier gid, int nMinJunctionReads, int nMinCovPerBase, double fMinCoveredBases, double fVariableExonThreshold, TreeSet<String> vcSelectedIsoforms, String strFileGTF, String strComment, String strPath) throws FileNotFoundException
-	{
-		String strFile = strPath + "/" + m_strProjectName + "_hits.txt";
-		File pFileIn = new File(strFile);
-		
-		// open output file
-		String strFileTmp = strPath + "/" + m_strProjectName + "_hits.tmp";
-		PrintWriter pTmp = new PrintWriter(new FileOutputStream(strFileTmp, true));
-		
-		// add all previous hits to the output file, except for hits matching the current gene id
-		if(pFileIn.exists())
-		{
-			Scanner pIn = new Scanner(pFileIn);
-			
-			while(pIn.hasNextLine())
-			{
-				String strLine = pIn.nextLine();
-				
-				String pSplit[] = strLine.split("\t");
-				String strID = pSplit[1];
-				
-				if(strID.equals(gid.m_strEnsemblGeneID))
-					continue;
-				
-				pTmp.println(strLine);
-			}
-			
-			pIn.close();
-		}
-		
-		// add new result
-		pFileIn.delete();
-		String strOut = nRating + "\t" + gid.m_strEnsemblGeneID + "\t" + strFileGTF + "\t" + nMinJunctionReads + "\t" + nMinCovPerBase + "\t" + fMinCoveredBases + "\t" + fVariableExonThreshold + "\t" + strComment;
-		for(String strIsoform : vcSelectedIsoforms)
-			strOut += "\t" + strIsoform;
-		
-		pTmp.println(strOut);
-		pTmp.close();
-		
-		File pOut = new File(strFileTmp);
-		pOut.renameTo(pFileIn);
-	}
-
-	public void SaveSplicingHitsToFile(String strPath, TreeSet<SimpleSpliceScore> vcHits) throws IOException
-	{
-		String strFileData = strPath + "/" + m_strProjectName + "_splicing_hits.dat";
-		String strFileIdx  = strPath + "/" + m_strProjectName + "_splicing_hits.idx";
-		
-		//###################################################################
-		//    check if the results for this gene have been stored already
-		//###################################################################
-		
-		String strGeneID = vcHits.first().m_strGeneID.split("\\.")[0];
-		
-		long nFileOffset = -1;
-		File pFileIdx = new File(strFileIdx);		
-		if(pFileIdx.exists())
-		{
-			Scanner pScanner = new Scanner(pFileIdx);
-			while(pScanner.hasNext())
-			{
-				String strLine = pScanner.nextLine();
-				
-				String pSplit[] = strLine.split("\t");
-
-				if(pSplit[0].equals(strGeneID))
-				{
-					nFileOffset = Long.parseLong(pSplit[1]);
-					break;
-				}
-			}
-			pScanner.close();
-		}
-		
-		if(nFileOffset == -1)
-		{
-			for(SimpleSpliceScore hit : vcHits)
-			{
-				//################################
-				//        add new result
-				//################################
-	
-				// open data file for appending
-				RandomAccessFile pOutData = new RandomAccessFile(strFileData, "rw");
-				
-				// override existing entry
-				if(nFileOffset != -1)
-				{
-					pOutData.seek(nFileOffset);
-				}
-				else // otherwise add to end of file
-				{
-					pOutData.seek(pOutData.length());
-					
-					PrintWriter pOutIdx = new PrintWriter(new FileOutputStream(strFileIdx, true));
-					pOutIdx.println(hit.m_strGeneID.split("\\.")[0] + "\t" + pOutData.length());
-					pOutIdx.close();
-				}
-				
-				// write gene information
-				hit.WriteToFile(pOutData);
-				
-				pOutData.close();
-			}
-		}
-	}
-	
-	public TreeSet<SimpleSpliceScore> GetSplicingHitForGene(String strPath, Gene gene) throws IOException
-	{
-		TreeSet<SimpleSpliceScore> vcResults = new TreeSet<SimpleSpliceScore>();
-
-		String strFileData = strPath + "/" + m_strProjectName + "_splicing_hits.dat";
-		String strFileIdx  = strPath + "/" + m_strProjectName + "_splicing_hits.idx";
-		
-		String strGeneID = gene.getGeneID().split("\\.")[0];
-		
-		// get file offset
-		long nFileOffset = -1;
-		File pFileIdx = new File(strFileIdx);		
-		if(pFileIdx.exists())
-		{
-			Scanner pScanner = new Scanner(pFileIdx);
-			while(pScanner.hasNext())
-			{
-				String strLine = pScanner.nextLine();
-				
-				String pSplit[] = strLine.split("\t");
-				
-				if(pSplit[0].equals(strGeneID))
-				{					
-					nFileOffset = Long.parseLong(pSplit[1]);
-					break;
-				}
-			}
-			pScanner.close();
-		}
-		
-		if(nFileOffset == -1)
-			return null;
-		
-		RandomAccessFile pFile = new RandomAccessFile(strFileData, "r");
-		pFile.seek(nFileOffset);
-
-		while(pFile.getFilePointer() < pFile.length())
-		{
-			SimpleSpliceScore hit = new SimpleSpliceScore();
-			hit.ReadFromFile(pFile);
-			
-			if(hit.m_strGeneID.equals(gene.getGeneID()))
-			{
-				vcResults.add(hit);
-			}
-		}
-		
-		pFile.close();
-
-		return vcResults;
-	}
 
 	@Override
 	public int compareTo(ProjectModel other)
@@ -1289,7 +1036,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		return m_strProjectName.compareTo(other.m_strProjectName);
 	}
 
-	// check whether the data is paired for the given conditions
+	/** check whether the data is paired for the given conditions */
 	boolean ValidatePairedData()
 	{
 		for(String strIndividual : m_mapSamplesToIndividuals.keySet())
@@ -1307,6 +1054,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		return true;
 	}
 	
+	/** Returns whether the two specified conditions of the given condition type contain paired-data */
 	public boolean ConditionsHavePairedData(String strConditionType, String strConditionA, String strConditionB)
 	{
 		if(!m_bDataIsPaired)
@@ -1333,6 +1081,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		return false;
 	}
 	
+	/** Returns whether the project includes paired-data */
 	boolean ProjectHasPairedData()
 	{
 		return m_bDataIsPaired;

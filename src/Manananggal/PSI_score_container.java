@@ -21,6 +21,10 @@ import java.util.Vector;
 
 import BioKit.Gene;
 
+/**
+ *    The PSI_score_container includes all PSI score results
+ *    that were generated during the analysis of the current gene.
+ */
 public class PSI_score_container
 {
 	TreeSet<PSI_score_result> 	m_vcResults;

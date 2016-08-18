@@ -20,15 +20,13 @@ package Manananggal;
 import java.util.Locale;
 import java.util.TreeSet;
 
-//################################################################################
-//
-//    Most functionality was replaced by "AnalysisResult".
-//
-//    This class is used during the detection of exon skipping event and holds
-//    a TreeSet of potentially alternatively spliced exons and information
-//    on the settings used for the detection.
-//    
-//################################################################################
+/**
+ *    Most functionality was replaced by "AnalysisResult".
+ *    
+ *    This class is used during the detection of exon skipping event and holds
+ *    a TreeSet of potentially alternatively spliced exons and information
+ *    on the settings used for the detection.
+ */
 public class AlternativeSplicingHit implements Comparable<AlternativeSplicingHit>
 {
 	private String			m_strGeneID;

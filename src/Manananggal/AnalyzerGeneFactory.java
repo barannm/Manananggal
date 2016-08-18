@@ -31,8 +31,17 @@ import BioKit.GTFParser;
 import BioKit.Gene;
 import BioKit.RandomAccessGFFReader;
 
+/**
+ *    The analyzer gene factory (I should rename it some time) includes the console application
+ *    functions that are necessary to search for AS events in all genes. 
+ */
 public class AnalyzerGeneFactory
 {
+	/**
+	 *    RunCompleteAnalysis starts the analysis for all genes included in the GTF file (specified as parameter) for a given condition type.
+	 *    Optionally, if strFirstGene is specified, the analysis will start at the specified gene entry, thus skipping all previous genes.
+	 *    If debug is specified, only a single gene (must be specified via strFirstGene) will be analyzed.
+	 */
 	public void RunCompleteAnalysis(SplicingWebApp app, String strFileGTF, String strFileProject, String strConditionType, String strFirstGene, boolean bSkipFirstAndLastExon, boolean bDebug, int nThreads) throws IOException
 	{
 		//###################################################################
@@ -307,6 +316,7 @@ public class AnalyzerGeneFactory
 		pWriterEE.close();
 	}
 	
+	/** Invoked from "RunCompleteAnalysis". This functions analyzes the current gene. */
 	public TreeSet<AnalysisResult> AnalyzeCurrentGene(SplicingWebApp app, boolean bSkipFirstAndLastExon, boolean bIdentifyValidIsoforms, int nID, boolean bDebug) throws IOException
 	{
 		//TODO

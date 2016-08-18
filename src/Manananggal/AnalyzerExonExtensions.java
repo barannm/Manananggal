@@ -27,10 +27,10 @@ import org.apache.commons.math3.stat.inference.TTest;
 import BioKit.Exon;
 import BioKit.ExonGroup;
 
-//###########################################################################
-//  This class is used to identify alternatively spliced exon extensions.
-//  The detection is solely based on changes in PSI scores.
-//###########################################################################
+/**
+ *    This class is used to identify alternatively spliced exon extensions
+ *    The detection is solely based on changes in PSI scores.
+ */
 public class AnalyzerExonExtensions
 {
 	public TreeSet<SimpleSpliceScore> IdentifyExonExtensionEvents(SplicingWebApp app, boolean bDebug, TreeSet<SimpleSpliceScore> results) throws IOException
@@ -346,13 +346,13 @@ public class AnalyzerExonExtensions
 											if(k == 0)
 											{
 												SimpleSpliceScore score = new SimpleSpliceScore(data.GetGeneID(), jun1, jun2, fPValue, fIncLevelChange, strConditionA, strConditionB, SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END);
-												score.GetValidIsoforms(data.GetGene());
+												score.CheckIfNovel(data.GetGene());
 												results.add(score);
 											}
 											else
 											{
 												SimpleSpliceScore score = new SimpleSpliceScore(data.GetGeneID(), jun1, jun2, fPValue, fIncLevelChange, strConditionA, strConditionB, SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END);
-												score.GetValidIsoforms(data.GetGene());
+												score.CheckIfNovel(data.GetGene());
 												results.add(score);
 											}
 										}

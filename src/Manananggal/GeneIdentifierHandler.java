@@ -22,13 +22,19 @@ import java.util.Vector;
 
 import BioKit.Gene;
 
-
+/**
+ *    The GeneIdentifierHandler includes a list of GeneIdentifiers
+ *    and some indices for a faster search of gene IDs and gene symbols.
+ *    It provides different functions to retrieve the gene identifier
+ *    for a given gene or transcript id.
+ */
 public class GeneIdentifierHandler
 {
 	Vector<GeneIdentifier>		m_vcGeneIdentifiers;
 	Vector<GeneIdentifierRange> m_vcRangesEnsemblIDs;
 	Vector<GeneIdentifierRange> m_vcRangesSymbols;
 	
+	/** Helper class used to index the gene identifiers for faster access*/
 	private class GeneIdentifierRange
 	{
 		String m_strFirstString;
@@ -137,8 +143,11 @@ public class GeneIdentifierHandler
 		System.out.println("read " + nIdx + " gene identifiers from cross reference file");
 	}
 	
-	// search for gene identifiers (strID may be the gene ID or gene symbol)
-	// - 'gene' is an optional parameter and may be null
+	/**
+	 *    Searches for the gene identifier associated with either a gene
+	 *    or gene symbol.
+	 *    The 'gene' parameter may be null.
+	 */
 	public GeneIdentifier GetGeneIdentifierForGene(String strID, Gene gene)
 	{		
 		// search by ID
@@ -203,7 +212,10 @@ public class GeneIdentifierHandler
 		return null;
 	}
 	
-	// this function 'requires' the gene parameter
+	/**
+	 *  Returns the gene identifier associated with a specific isoform 
+	 *  The function requires the gene parameter.
+	 */
 	public GeneIdentifier GetGeneIdentifierForTranscript(String strIsoformID, Gene gene)
 	{
 		// search by ID
@@ -273,11 +285,17 @@ public class GeneIdentifierHandler
 		return gid;
 	}
 	
+	/** Returns all GeneIdentifiers*/
 	public Vector<GeneIdentifier> GetAllGeneIdentifiers()
 	{
 		return m_vcGeneIdentifiers;
 	}
 
+	/**
+	 *    Returns a list of gene identifiers that start with a certain string.
+	 *    This function is used in the band box that opens when the user starts
+	 *    typing a gene name.
+	 */
 	public Vector<GeneIdentifier> GetAllGeneIdentifiersStartingWith(String strQuery)
 	{
 		Vector<GeneIdentifier> vcResult = new Vector<GeneIdentifier>();
@@ -347,6 +365,7 @@ public class GeneIdentifierHandler
 		return vcResult;
 	}
 	
+	/** Makes all gene identifiers valid */
 	public void EnableAll()
 	{
 		for(GeneIdentifier gid : m_vcGeneIdentifiers)

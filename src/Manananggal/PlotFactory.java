@@ -23,21 +23,19 @@ import java.awt.Graphics2D;
 import java.awt.LinearGradientPaint;
 import java.awt.Point;
 import java.awt.Polygon;
-import java.awt.RadialGradientPaint;
 import java.awt.RenderingHints;
 import java.awt.Shape;
-import java.awt.MultipleGradientPaint.CycleMethod;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
-import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -48,6 +46,7 @@ import java.util.Vector;
 
 import javax.imageio.ImageIO;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.stat.StatUtils;
 import org.apache.commons.math3.stat.inference.OneWayAnova;
 import org.zkoss.zk.ui.Executions;
@@ -74,31 +73,36 @@ import BioKit.ExonGroup;
 import BioKit.Gene;
 import BioKit.RandomAccessGFFReader;
 
+/**
+ *    The plot factory handles most of the drawing concerning coverage plots and isoform plots.
+ *    The only exception are the plots associated with GTEX data that have their own PlotFactory.
+ */
 public class PlotFactory
 {
-	SplicingWebApp					m_app;
-	private int 					m_nMaxWidth;
-	private TreeMap<String, Color> 	m_mapColorsToConditions;
-	private int						m_nClientWindowWidth;
-	private int						m_nClientWindowHeight;
+	SplicingWebApp					m_app;                          // app object, used to get data on the current gene
+	private int 					m_nMaxWidth;                    // maximum plot width (determined by client width by default)
+	private TreeMap<String, Color> 	m_mapColorsToConditions;        // defines the colors per condition
+	private int						m_nClientWindowWidth;           // store client window width
+	private int						m_nClientWindowHeight;          // store client window height
 	
-	private boolean					m_bCoveragePlotUseLog2;
-	private boolean					m_bCoveragePlotShowMean;
-	private boolean					m_bCoveragePlotShowGeometricMean;
-	private boolean					m_bCoveragePlotShowMedian;
-	private boolean					m_bCoveragePlotShowRelativeCoverage;
-	private boolean					m_bCoveragePlotShowQuartiles;
-	private boolean					m_bCoverageRequiresRedraw;
-	private boolean					m_bShowUniqueFeatures;
-	private boolean					m_bShowAmbigiousUniqueExons;
-	private boolean					m_bColorJunctionPaths;
-	private boolean					m_bShowCoverageGrid;
+	private boolean					m_bCoveragePlotUseLog2;         // show log2 coverage
+	private boolean					m_bCoveragePlotShowMean;        //  show mean coverage 
+	private boolean					m_bCoveragePlotShowGeometricMean;   // show geometric mean coverage
+	private boolean					m_bCoveragePlotShowMedian;      // show median coverage
+	private boolean					m_bCoveragePlotShowRelativeCoverage; // show relative coverage
+	private boolean					m_bCoveragePlotShowQuartiles;   // draw the upper and lower quartiles in the coverage plot
+	private boolean					m_bCoverageRequiresRedraw;      // indicates that the coverage plot must be redrawn
+	private boolean					m_bShowUniqueFeatures;          // colors exons and junctions that are unique to a single isoform
+	private boolean					m_bShowAmbigiousUniqueExons;    // color exons for which coverage could not be determine unambiguously
+	private boolean					m_bShowCoverageGrid;            // show the light grey grid in the coverage window
+	private boolean					m_bSwitchStrands; 	            // flip the image (second strand transcripts will be drawn from left to right)
 	
-	private boolean					m_bShowSecondCoveragePlot;
-	private boolean					m_bColorExonsAndJunctionsByCoverage;
+	private boolean					m_bShowSecondCoveragePlot;      // adds a second coverage plot that is attached to the isoform plot
+	private boolean					m_bColorExonsAndJunctionsByCoverage; // color exons and junctions based on their coverage values
 
 	TreeSet<CountElement>			m_vcUnknownJunctions;	// junctions that do not match any known isoform
 
+	/** Helper class that stores drawing offsets */
 	private class DrawingOffsets
 	{
 		int m_nBorderOffset;
@@ -107,6 +111,17 @@ public class PlotFactory
 		int m_nMMSeqTextLength;
 		int m_nIntronLength;
 		int m_nTotalWidth;
+		
+		public String toString()
+		{
+			String strOut = "border offset: " + m_nBorderOffset + "\n" +
+					        "isoform offset: " + m_nIsoformNameOffset + "\n" +
+					        "max exon length: " + m_nMaxExonLength + "\n" +
+					        "MMSEQ text length: " + m_nMMSeqTextLength + "\n" +
+					        "intron length: " + m_nIntronLength + "\n" +
+					        "total width: " + m_nTotalWidth + "\n";
+			return strOut;
+		}
 	};
 	
 	//##########################################################################
@@ -166,11 +181,12 @@ public class PlotFactory
 		m_bColorExonsAndJunctionsByCoverage		= true;
 		
 		m_bCoverageRequiresRedraw				= true;
-		m_bColorJunctionPaths					= false;
+		m_bSwitchStrands						= false;
 
 		m_vcUnknownJunctions					= new TreeSet<CountElement>();
 	}
 	
+	/** Returns the client window width and height */
 	public int[] GetClientSize()
 	{
 		int pResult[] = new int[2];
@@ -180,22 +196,32 @@ public class PlotFactory
 		return pResult;
 	}
 
+	/**
+	 *    Specifies which junctions are unannotated. These junctions
+	 *    will be colored in a different color .
+	 */
 	public void SetUnknownJunctions(TreeSet<CountElement> vcJunctions)
 	{
 		m_vcUnknownJunctions.clear();
 		m_vcUnknownJunctions.addAll(vcJunctions);
 	}
 	
+	/** Adds an unannotated junction */
 	public void AddUnknownJunction(CountElement jun)
 	{
 		m_vcUnknownJunctions.add(jun);
 	}
 	
+	/** Clears the list of unannotated junctions */
 	public void ClearUnknownJunctions()
 	{
 		m_vcUnknownJunctions.clear();
 	}
 	
+	/**
+	 *    Sets the client window width and height.
+	 *    This function is invoked once, when the GUI is initialized.
+	 */
 	public void SetClientSize(int nClientWidth, int nClientHeight)
 	{
 		m_nMaxWidth			  = nClientWidth;
@@ -203,16 +229,22 @@ public class PlotFactory
 		m_nClientWindowHeight = nClientHeight;
 	}
 	
+	/**
+	 *   Sets the maximum plot width. By default this value equals the client window width, 
+	 *   but it may be larger (or smaller).
+	 */
 	public void SetMaxWidth(int nWidth)
 	{
 		m_nMaxWidth = nWidth;
 	}
 	
+	/** Show the coverage plot as log2 transformed values */
 	public void ShowAsLog2(boolean bState)
 	{
 		m_bCoveragePlotUseLog2 = bState;
 	}
 	
+	/** Show the mean coverage value for each base */
 	public void ShowMeanCoverage(boolean bState)
 	{
 		m_bCoveragePlotShowMean = bState;
@@ -224,6 +256,7 @@ public class PlotFactory
 		}
 	}
 	
+	/** Show the geometric mean coverage value for each base */
 	public void ShowGeometricMeanCoverage(boolean bState)
 	{
 		m_bCoveragePlotShowGeometricMean = bState;
@@ -235,6 +268,7 @@ public class PlotFactory
 		}
 	}
 	
+	/** Show the median coverage value for each base */
 	public void ShowMedianCoverage(boolean bState)
 	{
 		m_bCoveragePlotShowMedian = bState;
@@ -246,21 +280,25 @@ public class PlotFactory
 		}
 	}
 	
+	/** Show the relative coverage plot */
 	public void ShowRelativeCoverage(boolean bState)
 	{
 		m_bCoveragePlotShowRelativeCoverage = bState;
 	}
 	
+	/** Show the upper and lower quartiles. Not available if showing relative coverage values */
 	public void ShowQuartiles(boolean bState)
 	{
 		m_bCoveragePlotShowQuartiles = bState;
 	}
 	
+	/** Adds a second coverage plot directly above the isoform plot that allows synchronized scrolling */
 	public void ShowSecondCoveragePlot(boolean bState)
 	{
 		m_bShowSecondCoveragePlot = bState;
 	}
 	
+	/** Highlight unique isoform elements (e.g. exons only present in a single isoform) */
 	public void ShowUniqueFeatures(boolean bState)
 	{
 		m_bShowUniqueFeatures		= bState;
@@ -269,36 +307,49 @@ public class PlotFactory
 		m_bColorExonsAndJunctionsByCoverage = !bState;
 	}
 	
+	/** Add expression dependent colors to exons and junctions */
 	public void ShowColoredExonsAndJunctions(boolean bState)
 	{
 		m_bColorExonsAndJunctionsByCoverage = bState;
 	}
 	
+	/** Show light gray grid in the coverage plots */
 	public void ShowCoverageGrid(boolean bState)
 	{
 		m_bShowCoverageGrid = bState;
 	}
 	
+	/** Set the color for a specific condition */
 	public void UpdateColorSelection(String strCondition, Color clr)
 	{
 		m_mapColorsToConditions.put(strCondition, clr);
 	}
 	
+	/** Request a redraw of the coverage on the next call of DrawPlots()*/
 	public void RequestCoverageRedraw()
 	{
 		m_bCoverageRequiresRedraw = true;
 	}
 	
+	/** Always show the gene in left (5') to right (3') direction. */
+	public void ToggleSwitchStrand(boolean bState)
+	{
+		m_bSwitchStrands = bState;
+	}
+	
+	/** Returns whether the relative coverage plot should be drawn */
 	public boolean IsRelativeCoverageEnabled()
 	{
 		return m_bCoveragePlotShowRelativeCoverage;
 	}
 	
+	/** Returns whether log2 coverage values should be plotted */
 	public boolean IsLog2Enabled()
 	{
 		return m_bCoveragePlotUseLog2;
 	}
 	
+	/** Returns the color for a specific condition */
 	public Color GetColorForCondition(String strCondition)
 	{
 		if(m_mapColorsToConditions.containsKey(strCondition))
@@ -307,31 +358,37 @@ public class PlotFactory
 		return null;
 	}
 	
+	/** Returns whether the median coverage should be plotted */
 	public boolean IsMedianEnabled()
 	{
 		return m_bCoveragePlotShowMedian; 
 	}
 	
+	/** Returns whether the mean coverage should be plotted */
 	public boolean IsMeanEnabled()
 	{
 		return m_bCoveragePlotShowMean;
 	}
 	
+	/** Returns whether the geometric mean coverage should be plotted */
 	public boolean IsGeometricMeanEnabled()
 	{
 		return m_bCoveragePlotShowGeometricMean;
 	}
 	
+	/** Returns whether the coverage quartiles should be plotted */
 	public boolean IsQuartilesEnabled()
 	{
 		return m_bCoveragePlotShowQuartiles;
 	}
 	
+	/** Returns whether a coverage plot should be added to the isoform plot */
 	public boolean IsSecondCoveragePlotEnabled()
 	{
 		return m_bShowSecondCoveragePlot;
 	}
 	
+	/** Retrives the color selection from the SplicingWebApp and stores it in the member variable m_mapColorsToConditions */
 	public void GetColorsPerCondition()
 	{
 		ProjectModel model 					= m_app.GetProjectModel();
@@ -386,181 +443,7 @@ public class PlotFactory
 		}
 	}
 	
-	public TreeMap<String, Double> CalculateRelativeExonExpressionPerCondition(TreeMap<String, Double> mapRelativeExonCoveragePerSample)
-	{
-		ProjectModel projectModel				= m_app.GetProjectModel();
-		String strSelectedConditionType 		= m_app.GetSelectedConditionType();
-		
-		TreeMap<String, TreeSet<String>> vcSamplesPerCondition = projectModel.GetSamplesPerCondition(strSelectedConditionType);
-		TreeMap<String, Double> mapRelativeExonCoveragePerCondition = new TreeMap<String, Double>();
-
-		for(String strCondition : vcSamplesPerCondition.keySet())
-		{
-			Vector<Double> vcCoveragesPerSample = new Vector<Double>();
-
-			for(String strSample : vcSamplesPerCondition.get(strCondition))
-			{
-				if(mapRelativeExonCoveragePerSample.containsKey(strSample))
-				{
-					vcCoveragesPerSample.add(mapRelativeExonCoveragePerSample.get(strSample));
-				}
-			}
-			
-			if(vcCoveragesPerSample.size() == 0)
-			{
-				mapRelativeExonCoveragePerCondition.put(strCondition, 0.0);
-			}
-			else
-			{
-				double[] pCoveragesPerSample = new double[vcCoveragesPerSample.size()];
-				for(int i=0; i<vcCoveragesPerSample.size(); i++)
-					pCoveragesPerSample[i] = vcCoveragesPerSample.get(i);
-				
-				double fMean = StatUtils.mean(pCoveragesPerSample);
-				mapRelativeExonCoveragePerCondition.put(strCondition, fMean);
-				
-//				double fMedian = StatUtils.geometricMean(pCoveragesPerSample);
-//				mapRelativeExonCoveragePerCondition.put(strCondition, fMedian);
-			}
-		}
-		
-		return mapRelativeExonCoveragePerCondition;
-	}
-	
-	public TreeMap<String, Double> CalculateRelativeJunctionExpressionPerCondition(int nJunctionPathID)
-	{
-		ProjectModel projectModel				= m_app.GetProjectModel();
-		String strSelectedConditionType 		= m_app.GetSelectedConditionType();
-		TreeMap<String, TreeMap<Integer, Double>> mapCoveragePerJunctionPathAndSample = m_app.GetCoveragePerJunctionPathAndSample();
-		
-		TreeMap<String, Double> mapRelativeJunctionCoveragePerCondition = new TreeMap<String, Double>();
-		TreeMap<String, TreeSet<String>> mapSamplesPerCondition = projectModel.GetSamplesPerCondition(strSelectedConditionType);
-		
-		for(String strCondition : mapSamplesPerCondition.keySet())
-		{
-			double pValues[] = new double[mapSamplesPerCondition.get(strCondition).size()];
-			
-			int nSample = 0;
-			for(String strSample : mapSamplesPerCondition.get(strCondition))
-			{
-				pValues[nSample] = mapCoveragePerJunctionPathAndSample.get(strSample).get(nJunctionPathID);
-				nSample += 1;
-			}
-			
-			double fMedian = StatUtils.percentile(pValues, 50);
-			mapRelativeJunctionCoveragePerCondition.put(strCondition, fMedian);
-		}
-		
-		return mapRelativeJunctionCoveragePerCondition;
-	}
-	
-	public void CreateCoverageMatrix() throws IOException
-	{
-		ProjectModel projectModel				= m_app.GetProjectModel();
-		DataSupplier dataSupplier				= m_app.GetDataSupplier();
-		String strSelectedConditionType 		= m_app.GetSelectedConditionType();
-		
-		PrintWriter pOut = new PrintWriter(new File(m_app.GetPathToTemporaryDirectory() + "/" + dataSupplier.GetReferenceName() + "_all_exon_groups.txt"));
-		ExonGroup pGroups[] = dataSupplier.GetExonGroups();
-
-		TreeMap<String, TreeSet<String>> mapSamplesToConditions = projectModel.GetSamplesPerCondition(strSelectedConditionType);
-		
-		// write header
-		for(String strCondition : mapSamplesToConditions.keySet())
-		{
-			for(String strSample : mapSamplesToConditions.get(strCondition))
-			{
-				pOut.print("\t" + strSample);
-			}			
-		}
-		pOut.print("\n");
-
-		for(ExonGroup grp : pGroups)
-		{
-			pOut.print(dataSupplier.GetReferenceName() + ":" + grp.getGenomicStartOfGroup() + "-" + grp.getGenomicStopOfGroup());
-			
-			for(String strCondition : mapSamplesToConditions.keySet())
-			{
-				for(String strSample : mapSamplesToConditions.get(strCondition))
-				{
-					double pValues[] = m_app.GetCoverageForExonGroup(grp, strSample, true);			
-					double fMeanCoverage = StatUtils.mean(pValues);
-
-					pOut.print("\t" + fMeanCoverage);	
-				}
-			}
-			pOut.print("\n");
-		}
-		
-		pOut.close();
-		
-		// output matrix for selected exon groups
-		pOut = new PrintWriter(new File(m_app.GetPathToTemporaryDirectory() + "/" + dataSupplier.GetReferenceName() + "_selected_exon_groups.txt"));
-
-		// write header
-		for(String strCondition : mapSamplesToConditions.keySet())
-		{
-			for(String strSample : mapSamplesToConditions.get(strCondition))
-			{
-				pOut.print("\t" + strSample);
-			}			
-		}
-		pOut.print("\n");
-
-		for(ExonGroup grp : dataSupplier.GetExonGroups())
-		{
-			pOut.print(dataSupplier.GetReferenceName() + ":" + grp.getGenomicStartOfGroup() + "-" + grp.getGenomicStopOfGroup());
-			
-			for(String strCondition : mapSamplesToConditions.keySet())
-			{
-				for(String strSample : mapSamplesToConditions.get(strCondition))
-				{
-					double pValues[] = m_app.GetCoverageForExonGroup(grp, strSample, true);			
-					double fMeanCoverage = StatUtils.mean(pValues);
-
-					pOut.print("\t" + fMeanCoverage);	
-				}
-			}
-			pOut.print("\n");
-		}
-		
-		pOut.close();
-		
-		// output matrix for all exons
-		Exon pExons[] = dataSupplier.GetExons();
-
-		pOut = new PrintWriter(new File(m_app.GetPathToTemporaryDirectory() + "/" + dataSupplier.GetReferenceName() + "_all_exons.txt"));
-
-		// write header
-		for(String strCondition : mapSamplesToConditions.keySet())
-		{
-			for(String strSample : mapSamplesToConditions.get(strCondition))
-			{
-				pOut.print("\t" + strSample);
-			}			
-		}
-		pOut.print("\n");
-
-		for(Exon ex : pExons)
-		{
-			pOut.print(dataSupplier.GetReferenceName() + ":" + ex.getGenomicStart() + "-" + ex.getGenomicStop());
-			
-			for(String strCondition : mapSamplesToConditions.keySet())
-			{
-				for(String strSample : mapSamplesToConditions.get(strCondition))
-				{
-					double pValues[] = m_app.GetCoverageForExon(ex, strSample, true);			
-					double fMeanCoverage = StatUtils.mean(pValues);
-
-					pOut.print("\t" + fMeanCoverage);	
-				}
-			}
-			pOut.print("\n");
-		}
-		
-		pOut.close();
-	}
-	
+	/** Computes the drawing offsets based on the specified maximum width of the plots */
 	private DrawingOffsets ComputeDrawingOffsets()
 	{
 		ProjectModel model 					= m_app.GetProjectModel();
@@ -625,7 +508,11 @@ public class PlotFactory
 		return res;
 	}
 	
-	private double AddYAxis(double fPosX, double fPosY, double fHeight, double fMaximumValue, String strLabel, Graphics2D graph)
+	/**
+	 *    Adds a y-axis ranging from 0 to fMaximum value to a graph at position fPosX/fPosY. The height of the axis is determined
+	 *    by fHeight. The axis title is specified by strTitle.
+	 */
+	private double AddYAxis(double fPosX, double fPosY, double fHeight, double fMaximumValue, String strTitle, Graphics2D graph)
 	{
 		// draw axis
 		Line2D.Double line = new Line2D.Double(fPosX, fPosY, fPosX, fPosY+fHeight);
@@ -634,12 +521,19 @@ public class PlotFactory
 		// set font
 		Font fontNormalText		 = new Font("Lucida Sans", Font.PLAIN, 13);
 		FontMetrics fontMetrics  = graph.getFontMetrics(fontNormalText);
-/*	
-		// add x-axis label
-		int nStringWidth  = fontMetrics.stringWidth(strLabel);
+		graph.setFont(fontNormalText);
+		graph.setColor(Color.BLACK);
+	
+		// add y-axis label
+		// set font
+		int nStringWidth  = fontMetrics.stringWidth(strTitle);
 		int nStringHeight  = fontMetrics.getHeight();
-		graph.drawString(strLabel, (int)(fPosX + fWidth*0.5 - nStringWidth*0.5), (int)(fPosY+nStringHeight+20));
-*/
+		AffineTransform trans = graph.getTransform();
+		graph.translate((int)(fPosX-nStringHeight-30), (int)(fPosY + fHeight*0.5 + nStringWidth*0.5));
+		graph.rotate(-Math.PI/2);
+		graph.drawString(strTitle, 0,0);
+		graph.setTransform(trans);
+
 		// add ticks to y-axis
 		double fStep = 0;
 		
@@ -659,7 +553,6 @@ public class PlotFactory
 		fontNormalText	= new Font("Lucida Sans", Font.PLAIN, 11);
 		fontMetrics  	= graph.getFontMetrics(fontNormalText);
 		graph.setFont(fontNormalText);
-		graph.setColor(Color.BLACK);
 		
 		fMaximumValue = Math.ceil(fMaximumValue / fStep)*fStep;
 
@@ -682,8 +575,8 @@ public class PlotFactory
 			line = new Line2D.Double(fPosX-2, fYPos, fPosX, fYPos);
 			graph.draw(line);
 							
-			int nStringWidth  = fontMetrics.stringWidth(strValue);
-			int nStringHeight = fontMetrics.getHeight();
+			nStringWidth  = fontMetrics.stringWidth(strValue);
+			nStringHeight = fontMetrics.getHeight();
 			
 			graph.drawString(strValue, (int)(fPosX-3-nStringWidth), (int)(fYPos + nStringHeight*0.25));
 			
@@ -693,7 +586,11 @@ public class PlotFactory
 		return fMaximumValue;
 	}
 	
-	private double AddXAxis(double fPosX, double fPosY, double fWidth, double fMaximumValue, String strLabel, Graphics2D graph)
+	/**
+	 *    Adds an x-axis ranging from 0 to fMaximum value to a graph at position fPosX/fPosY. The width of the axis is determined
+	 *    by fWidth. The axis title is specified by strTitle.
+	 */
+	private double AddXAxis(double fPosX, double fPosY, double fWidth, double fMaximumValue, String strTitle, Graphics2D graph)
 	{
 		// draw axis
 		Line2D.Double line = new Line2D.Double(fPosX, fPosY, fPosX+fWidth, fPosY);
@@ -702,11 +599,6 @@ public class PlotFactory
 		// set font
 		Font fontNormalText		 = new Font("Lucida Sans", Font.PLAIN, 13);
 		FontMetrics fontMetrics  = graph.getFontMetrics(fontNormalText);
-		
-		// add x-axis label
-		int nStringWidth  = fontMetrics.stringWidth(strLabel);
-		int nStringHeight  = fontMetrics.getHeight();
-		graph.drawString(strLabel, (int)(fPosX + fWidth*0.5 - nStringWidth*0.5), (int)(fPosY+nStringHeight+20));
 				
 		// add ticks to y-axis
 		double fStep = 0;
@@ -723,6 +615,14 @@ public class PlotFactory
 		{
 			fStep = fMaximumValue / 10.0;
 		}
+		
+		// add x-axis label
+		int nStringWidth  = fontMetrics.stringWidth(strTitle);
+		int nStringHeight = fontMetrics.getHeight();
+		if(fMaximumValue > 99)
+			graph.drawString(strTitle, (int)(fPosX + fWidth*0.5 - nStringWidth*0.5), (int)(fPosY+nStringHeight*2+20));
+		else
+			graph.drawString(strTitle, (int)(fPosX + fWidth*0.5 - nStringWidth*0.5), (int)(fPosY+nStringHeight+20));
 
 		fontNormalText	= new Font("Lucida Sans", Font.PLAIN, 11);
 		fontMetrics  	= graph.getFontMetrics(fontNormalText);
@@ -766,12 +666,21 @@ public class PlotFactory
 		return fMaximumValue;
 	}
 	
+	/**
+	 *    Draws the coverage plot. Different visualizations are possible depending on the options selected (e.g. mean or median
+	 *    coverage plots).
+	 */
 	public void DrawExtendedCoveragePlot(boolean bAsPopupWindow) throws IOException
 	{
 		ProjectModel model 						= m_app.GetProjectModel();
 		String strSelectedConditionType 		= m_app.GetSelectedConditionType();
 		DataSupplier dataSupplier 				= m_app.GetDataSupplier();
 		TreeMap<String, String> mapBigWigFiles 	= model.GetBigWigFilesForSamples();
+		
+		// switch strand for second strand genes
+		boolean bShowSecondStrand = false;
+		if(m_bSwitchStrands && !dataSupplier.GetGene().isPlusStrand())
+			bShowSecondStrand = true;
 		
 		if(mapBigWigFiles == null)
 		{
@@ -882,6 +791,7 @@ public class PlotFactory
 		// prepare graph
 		BufferedImage img = new BufferedImage(offsets.m_nTotalWidth, nMaxHeight, BufferedImage.TYPE_INT_RGB);
 		Graphics2D graph = img.createGraphics();
+		graph.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		
 		// set font size
 		Font fontBoldText	= new Font("Lucida Sans", Font.BOLD, 13);
@@ -1037,8 +947,22 @@ public class PlotFactory
 				graph.drawString(strValue, (int)(nYAxisPos-3-nStringWidth), (int)(nYPos + nStringHeight*0.25));
 			}
 			
-			for(ExonGroup grp : pExonGroups)
+			int nFirstExonGroup = 0;
+			int nLastExonGroup  = pExonGroups.length;
+			int nChange = +1;
+			
+			// flip the plot of we're showing the second strand
+			if(bShowSecondStrand)
 			{
+				nFirstExonGroup = pExonGroups.length-1;
+				nLastExonGroup  = -1;
+				nChange = -1;
+			}
+			
+			for(int nGrp=nFirstExonGroup; nGrp!=nLastExonGroup; nGrp+=nChange)
+			{
+				ExonGroup grp = pExonGroups[nGrp];
+				
 				int nGrpStart = nOffsetX;
 				
 				// get correct group coverage data
@@ -1061,7 +985,7 @@ public class PlotFactory
 						int nCurrentSample = 0;
 						for(String strSample : mapSamplesToConditions.get(strCondition))
 						{
-							double pData[] =  mapData.get(strSample);						
+							double pData[] = mapData.get(strSample);						
 							for(int x=0; x<pData.length; x++)
 							{
 								double fValue = pData[x];
@@ -1071,6 +995,12 @@ public class PlotFactory
 							nCurrentSample += 1;
 						}
 						
+						// reverse array if second strand is to be plotted
+						if(bShowSecondStrand)
+						{
+							ArrayUtils.reverse(pValues);
+						}
+						
 						if(nCurrentSample != 0)
 							mapCoveragePerSamplePerCondition.put(strCondition, pValues);
 					}
@@ -1078,7 +1008,7 @@ public class PlotFactory
 				
 				for(int x=1; x<grp.getExonGroupLengthInBp(); x++)
 				{			
-					// get median coverage for all conditions
+					// get mean coverage for all conditions
 					TreeMap<String, Double> mapMedianCoverageToCondition = new TreeMap<String, Double>();
 					
 					// get coverage sum
@@ -1095,9 +1025,9 @@ public class PlotFactory
 						}
 
 //						double fMedian = StatUtils.percentile(pCov, 50.0);
-						double fMedian = StatUtils.mean(pCov);
-						mapMedianCoverageToCondition.put(strCondition, fMedian);
-						fTotalCoverage += fMedian;
+						double fMean = StatUtils.mean(pCov);
+						mapMedianCoverageToCondition.put(strCondition, fMean);
+						fTotalCoverage += fMean;
 					}
 					
 					if(fTotalCoverage == 0)
@@ -1122,7 +1052,7 @@ public class PlotFactory
 		else
 		{
 			//######################################################
-			//                   draw axis
+			//                   draw y-axis
 			//######################################################
 			graph.setFont(fontNormalText);
 			graph.setColor(Color.BLACK);
@@ -1172,8 +1102,21 @@ public class PlotFactory
 				nOffsetY += nSpacer + nPlotHeight;
 			}
 			
-			for(ExonGroup grp : pExonGroups)
+			int nFirstExonGroup = 0;
+			int nLastExonGroup  = pExonGroups.length;
+			int nChange = +1;
+			
+			// flip the plot of we're showing the second strand
+			if(bShowSecondStrand)
 			{
+				nFirstExonGroup = pExonGroups.length-1;
+				nLastExonGroup  = -1;
+				nChange = -1;
+			}
+			
+			for(int nGrp=nFirstExonGroup; nGrp!=nLastExonGroup; nGrp+=nChange)
+			{
+				ExonGroup grp = pExonGroups[nGrp];
 				int nGrpStart = nOffsetX;
 				
 				// get correct group coverage data
@@ -1204,6 +1147,12 @@ public class PlotFactory
 						for(String strSample : mapSamplesToConditions.get(strCondition))
 						{							
 							double pData[] =  mapData.get(strSample);
+							
+							// reverse the array if drawing the second strand
+							if(bShowSecondStrand)
+							{
+								ArrayUtils.reverse(pData);
+							}
 												
 							GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD, pValues.length);
 
@@ -1398,7 +1347,13 @@ public class PlotFactory
 		
 		m_bCoverageRequiresRedraw = false;
 	}
-	
+
+	/**
+	 *    Draws the isoform plot. Different information levels are added depending on the options selected.
+	 *    For example, tissue specific expression (entropy based) or exon skipping events  may be indicated
+	 *    on the meta exon track. The function became quite large, I might consider to split it into multiple
+	 *    smaller functions...
+	 */
 	public void DrawIsoforms() throws IOException
 	{
 		ProjectModel projectModel				= m_app.GetProjectModel();
@@ -1410,10 +1365,14 @@ public class PlotFactory
 		TreeSet<String> vcValidIsoforms			= m_app.GetValidIsoforms();
 		AnalysisResult  selectedResult			= m_app.GetSelectedResult();
 				
-		TreeMap<String, Double> mapEntropyToExonicParts 							= m_app.GetEntropyPerExonicPart();
-		TreeMap<String, TreeMap<Integer, TreeSet<String>>> mapAnalysedJunctionPaths = m_app.GetAnalysedJunctionPaths();
+		TreeMap<String, Double> mapEntropyToExonicParts = m_app.GetEntropyPerExonicPart();
 		
-		TreeMap<String, TreeSet<String>> mapSamplesToConditions =  projectModel.GetSamplesPerCondition(strSelectedConditionType);
+		TreeMap<String, TreeSet<String>> mapSamplesToConditions = projectModel.GetSamplesPerCondition(strSelectedConditionType);
+		
+		// switch strand for second strand genes
+		boolean bShowSecondStrand = false;
+		if(m_bSwitchStrands && !dataSupplier.GetGene().isPlusStrand())
+			bShowSecondStrand = true;
 		
 		TreeMap<String, Exon[]> mapExonsToUnknownIsoforms = new TreeMap<String, Exon[]>();
 		ExonGroup pExonGroups[] = dataSupplier.GetExonGroups();
@@ -1492,36 +1451,8 @@ public class PlotFactory
 			}
 		}
 		
-		// get first and second selected exon position
-		ExonGroup SelectedExonGrpA = null;
-		ExonGroup SelectedExonGrpB = null;
-		
-		ClickEvent clickEvent = m_app.GetClickEvent();
-
-		for(ExonGroup grp : pExonGroups)
-		{
-			if(grp.getGenomicStartOfGroup() >= clickEvent.m_nExonGroupStartA && grp.getGenomicStopOfGroup() <= clickEvent.m_nExonGroupEndA)
-			{
-				SelectedExonGrpA = grp;
-			}
-			
-			if(grp.getGenomicStartOfGroup() >= clickEvent.m_nExonGroupStartB && grp.getGenomicStopOfGroup() <= clickEvent.m_nExonGroupEndB)
-			{
-				SelectedExonGrpB = grp;
-			}
-		}
-		
 		// get mmseq results (if available)
 		TreeMap<String, TreeMap<String, Double>> mapIsoformExpressionValues = projectModel.GetIsoformExpressions(dataSupplier.GetGeneID(), m_app.GetPathToMMSeqResults());
-		
-		// clear all target isoforms
-		clickEvent.m_vcTargetIsoforms.clear();
-
-		// get potential 'click' target isoforms
-		for(String strIsoform : vcValidIsoforms)
-		{
-			clickEvent.m_vcTargetIsoforms.add(strIsoform);
-		}
 
 		int nVerticalSpaceBetweenIsoforms = 30;
 		
@@ -1541,6 +1472,7 @@ public class PlotFactory
 		}
 		
 		DrawingOffsets offsets = ComputeDrawingOffsets();
+		
 		// an additional 30 pixel as margin, and three more isoforms for the meta transcript and overlapping sense + antisense transcripts
 		int nMaxHeight  = (vcValidIsoforms.size()+mapExonsToUnknownIsoforms.size()+3) * nVerticalSpaceBetweenIsoforms + 20 + 30;
 		
@@ -1569,26 +1501,45 @@ public class PlotFactory
 		// calculate shrinkage factor
 		double fShrinkageFactor = (double)offsets.m_nMaxExonLength / (double)nCombinedExonLength;
 		
-		// calculate start position (=value) of each exon (=key)
+		// calculate start position (=value) of each exon (=key), this is required when drawing first strand transcripts
 		TreeMap<Integer, Integer> mapExonStarts = new TreeMap<Integer, Integer>(); 	// key = exon_id, value = exon_start_pos
 			
 		int nX = nOffsetX;
-		for(ExonGroup grp : pExonGroups)
+		for(int nGrp=0; nGrp<pExonGroups.length; nGrp++)
 		{
+			ExonGroup grp = pExonGroups[nGrp];
+			if(bShowSecondStrand)
+			{
+				grp = pExonGroups[pExonGroups.length - nGrp -1];
+			}
 			int nGrpStart = nX;
 			
 			for(Exon ex : grp.getExons())
 			{
 				int nExonID = ex.getExonID();
-				int nOffset = (int) ((ex.getGenomicStart() - grp.getGenomicStartOfGroup()) * fShrinkageFactor);
-				mapExonStarts.put(nExonID, nGrpStart + nOffset);
+
+				if(bShowSecondStrand)
+				{
+					// all exons must end at the same position
+					
+					double fVal1 = (grp.getGenomicStopOfGroup() - grp.getGenomicStartOfGroup()) * fShrinkageFactor;
+					double fVal2 = (ex.getGenomicStop() - grp.getGenomicStartOfGroup()) * fShrinkageFactor;
+					
+					int nOffset = (int) (fVal1 - fVal2);
+
+					mapExonStarts.put(nExonID, nGrpStart + nOffset);
+				}
+				else
+				{
+					// all exons must start at the same position
+					int nOffset = (int) ((ex.getGenomicStart() - grp.getGenomicStartOfGroup()) * fShrinkageFactor);
+					mapExonStarts.put(nExonID, nGrpStart + nOffset);
+				}
 			}
 
 			nX += (grp.getExonGroupLengthInBp() * fShrinkageFactor) + offsets.m_nIntronLength;
 		}
 
-		Color clrGradient1 = new Color(255,150,150);	// RED
-		Color clrGradient2 = new Color(200,0,0);		// RED
 		Color clrGradient3 = new Color(217,217,255);	// BLUE
 		Color clrGradient4 = new Color(120,120,230);	// BLUE
 		Color clrGradient5 = new Color(255,255,255);	// WHITE
@@ -1666,6 +1617,8 @@ public class PlotFactory
 		//#######################################################
 		//           add description to meta transcript
 		//#######################################################
+		nX = nOffsetX;
+
 		graph.setColor(Color.BLACK);
 		String strText = "meta exons";
 		int nTextWidth = fontMetrics.stringWidth(strText);
@@ -1675,8 +1628,22 @@ public class PlotFactory
 		//##############################################
 		//            draw meta transcript
 		//##############################################
-		for(ExonGroup grp : pExonGroups)
+		nX = nOffsetX;
+		int nFirstGroup  = 0;
+		int nLastGroup   = pExonGroups.length;
+		int nGroupChange = +1;
+		
+		if(bShowSecondStrand)
 		{
+			nFirstGroup  = pExonGroups.length-1;
+			nLastGroup   = -1;
+			nGroupChange = -1;
+		}
+		
+		for(int nGrp=nFirstGroup; nGrp!=nLastGroup; nGrp+=nGroupChange)
+		{
+			ExonGroup grp = pExonGroups[nGrp];
+			
 			int nExonGrpID = grp.getGroupID()+1;
 
 			int nWidth = (int)(grp.getExonGroupLengthInBp() * fShrinkageFactor);
@@ -1690,30 +1657,6 @@ public class PlotFactory
 			pFractions[0] = 0.0f;
 			pFractions[1] = 0.5f;
 			pFractions[2] = 1.0f;
-			
-			boolean bUseRadiantGradient = false;
-			if(SelectedExonGrpA != null && SelectedExonGrpA.getGroupID() == grp.getGroupID() || SelectedExonGrpB != null && SelectedExonGrpB.getGroupID() == grp.getGroupID())
-			{
-				pClrs = new Color[3];
-				pClrs[0] = new Color(255, 242, 0);
-				pClrs[1] = new Color(200, 190, 0);
-				pClrs[2] = new Color(255, 242, 0);
-				
-				pFractions[0] = 0.8f;
-				pFractions[1] = 0.9f;
-				pFractions[2] = 1.0f;
-				
-				Point2D.Double center = new Point2D.Double((float)(nX + nWidth * 0.5), (double)(nY+10));
-				float fRadius = nWidth*0.48f;
-				
-				RadialGradientPaint clrGradient = new RadialGradientPaint(center, fRadius, pFractions, pClrs, CycleMethod.NO_CYCLE);
-				
-				// draw exon
-				graph.setPaint(clrGradient);
-				graph.fillRect(nX, nY, nWidth, 20);
-				
-				bUseRadiantGradient = true;
-			}
 
 			// show alternatively spliced exon groups			
 			AnalysisResult res = null;
@@ -1741,15 +1684,12 @@ public class PlotFactory
 				pFractions[2] = 1.0f;
 			}
 			
-			if(!bUseRadiantGradient)
-			{
-				LinearGradientPaint clrGradient = new LinearGradientPaint(nX, nY, nX, nY+20, pFractions, pClrs);
+			LinearGradientPaint clrGradient = new LinearGradientPaint(nX, nY, nX, nY+20, pFractions, pClrs);
 				
-				// draw exon
-				graph.setPaint(clrGradient);
-				graph.fillRect(nX, nY, nWidth, 20);
-			}
-
+			// draw exon
+			graph.setPaint(clrGradient);
+			graph.fillRect(nX, nY, nWidth, 20);
+			
 			// add entropy levels if available
 			if(m_app.IsEntropyEnabled() && mapEntropyToExonicParts != null)
 			{
@@ -1809,13 +1749,17 @@ public class PlotFactory
 			fontMetrics = graph.getFontMetrics(fontNumbers);
 			
 			// add orientation
-			strText 			= "";
-			nTextWidth 		= 0;
-			int nLetterWidth 	= fontMetrics.stringWidth(">");
+			strText          = "";
+			nTextWidth 		 = 0;
+			int nLetterWidth = fontMetrics.stringWidth(">");
 			
 			while(nTextWidth < nWidth-20)
 			{
-				if(dataSupplier.GetStrand() == '+')
+				char chStrand = '+';
+				if(bShowSecondStrand)
+					chStrand = '-';
+				
+				if(dataSupplier.GetStrand() == chStrand)
 				{
 					strText += ">";
 					nTextWidth += nLetterWidth;
@@ -1862,13 +1806,13 @@ public class PlotFactory
 		TreeSet<String> vcIsoforms = new TreeSet<String>();
 		vcIsoforms.addAll(vcValidIsoforms);
 		vcIsoforms.addAll(mapExonsToUnknownIsoforms.keySet());
-		
-		clickEvent.m_vcSelectedExons.clear();
+
 		for(String strIsoform : vcIsoforms)
 		{
 			int nPreviousExonEnd   = -1;
 			int nPreviousExonGrpID = -1;
-			boolean bIsFirstExon = true;
+			Exon previousExon      = null;
+			boolean bIsFirstExon   = true;
 			
 			//#######################################################
 			//            add icon to unselect the isoform
@@ -1940,22 +1884,30 @@ public class PlotFactory
 				}
 			}
 			
-			for(int nExonIdx=0; nExonIdx<pIsoformExons.length; nExonIdx++)
+			int nFirstExon = 0;
+			int nLastExon  = pIsoformExons.length;
+			int nChange    = +1;
+			if(bShowSecondStrand)
+			{
+				nFirstExon = pIsoformExons.length-1;
+				nLastExon  = -1;
+				nChange    = -1;
+			}
+			
+			for(int nExonIdx=nFirstExon; nExonIdx!=nLastExon; nExonIdx+=nChange)
 			{
 				Exon exon = pIsoformExons[nExonIdx];
-				
+
 				// get ambigious exons within an exon group per condition
 				TreeMap<String, TreeSet<Exon>> mapAmbigiousExonsPerCondition = dataSupplier.GetMostFrequentSetOfAmbigiousExons(m_app, exon);
 				
 				// get exon group ID
-				ExonGroup exonGroup = null;
 				int nExonGrpID = -1;
 				for(ExonGroup grp : pExonGroups)
 				{
 					if(grp.groupContainsExon(exon.getExonID()))
 					{
 						nExonGrpID = grp.getGroupID()+1;
-						exonGroup = grp;
 					}
 				}
 				
@@ -1980,15 +1932,6 @@ public class PlotFactory
 
 				// exon fill color depends on strand orientation
 				GradientPaint clrGradient = null;
-
-				if(SelectedExonGrpA != null && SelectedExonGrpA.getGroupID() == exonGroup.getGroupID())
-				{
-					clickEvent.m_vcSelectedExons.add(exon);
-				}
-				else if(SelectedExonGrpA != null && SelectedExonGrpA.getGroupID() == exonGroup.getGroupID())
-				{
-					clickEvent.m_vcSelectedExons.add(exon);
-				}
 				clrGradient = new GradientPaint((int)(nX+nWidth*0.5), nY, clrGradient3, (int)(nX+nWidth*0.5), nY+20, clrGradient4);
 				
 				if(m_bShowUniqueFeatures)
@@ -2115,11 +2058,11 @@ public class PlotFactory
 				// determine whether the exon is a UTR exon
 				int nCodingStart = dataSupplier.GetCodingStartForIsoform(strIsoform);
 				int nCodingEnd	 = dataSupplier.GetCodingEndForIsoform(strIsoform);
-				
+
 				// full UTR exon
-				if((dataSupplier.GetStrand() == '+' && (exon.getGenomicStart() > nCodingEnd || exon.getGenomicStop() < nCodingStart)) ||
-					(dataSupplier.GetStrand() == '-' && (exon.getGenomicStart() > nCodingStart || exon.getGenomicStop() < nCodingEnd)) ||
-					(nCodingStart == Integer.MIN_VALUE && nCodingEnd == Integer.MAX_VALUE) || (nCodingStart == Integer.MAX_VALUE && nCodingEnd == Integer.MIN_VALUE))
+				if( (dataSupplier.GetStrand() == '+' && (exon.getGenomicStart() > nCodingEnd   || exon.getGenomicStop() < nCodingStart)) ||
+					(dataSupplier.GetStrand() != '+' && (exon.getGenomicStart() > nCodingStart || exon.getGenomicStop() < nCodingEnd))   ||
+					(nCodingStart == Integer.MIN_VALUE && nCodingEnd == Integer.MAX_VALUE)     || (nCodingStart == Integer.MAX_VALUE && nCodingEnd == Integer.MIN_VALUE))
 				{
 					graph.fillRect(nX, nY+4, nWidth, 12);
 
@@ -2128,7 +2071,7 @@ public class PlotFactory
 				}
 				// full CDS exon
 				else if(((dataSupplier.GetStrand() == '+' && exon.getGenomicStart() >= nCodingStart && exon.getGenomicStop() <= nCodingEnd) ||
-						(dataSupplier.GetStrand() == '-' && exon.getGenomicStart() >= nCodingEnd   && exon.getGenomicStop() <= nCodingStart)))
+						 (dataSupplier.GetStrand() != '+' && exon.getGenomicStart() >= nCodingEnd   && exon.getGenomicStop() <= nCodingStart)))
 				{
 					graph.fillRect(nX, nY, nWidth, 20);
 
@@ -2139,6 +2082,7 @@ public class PlotFactory
 				else
 				{
 					Polygon polyExon = new Polygon();
+					char chStrand = '+';
 					
 					int nMidPoint = 0;
 					boolean bIsCoding = false;
@@ -2147,7 +2091,13 @@ public class PlotFactory
 					{
 						nMidPoint = nCodingStart - exon.getGenomicStart();
 						
-						if(dataSupplier.GetStrand() == '+')
+						if(bShowSecondStrand)
+						{
+							nMidPoint = (exon.getGenomicStop() -exon.getGenomicStart()+1) - (nCodingStart - exon.getGenomicStart());
+							chStrand = '-';
+						}
+						
+						if(dataSupplier.GetStrand() == chStrand)
 						{
 						
 							if(exon.getGenomicStart() >= nCodingStart)
@@ -2167,7 +2117,13 @@ public class PlotFactory
 					{
 						nMidPoint = nCodingEnd - exon.getGenomicStart();
 						
-						if(dataSupplier.GetStrand() == '+')
+						if(bShowSecondStrand)
+						{
+							nMidPoint = (exon.getGenomicStop() -exon.getGenomicStart()+1) - (nCodingEnd - exon.getGenomicStart());
+							chStrand = '-';
+						}
+						
+						if(dataSupplier.GetStrand() == chStrand)
 						{
 							if(exon.getGenomicStart() >= nCodingEnd)
 								bIsCoding = true;
@@ -2278,37 +2234,34 @@ public class PlotFactory
 					bIsFirstExon = false;
 				else
 				{
-					int nIntronStart = nPreviousExonEnd;
-					int nIntrnLength = nX-nPreviousExonEnd;	// = length - 1
-					
-					Exon previousExon = pIsoformExons[nExonIdx-1];
+					int nIntronStart  = nPreviousExonEnd;
+					int nIntronLength = nX-nPreviousExonEnd;	// = length - 1
 					
 					CountElement junction = new CountElement();
-					junction.m_nStart 	= previousExon.getGenomicStop();
-					junction.m_nEnd		= exon.getGenomicStart();
+					
+					if(bShowSecondStrand)
+					{
+						junction.m_nStart 	= exon.getGenomicStop();
+						junction.m_nEnd		= previousExon.getGenomicStart();
+					}
+					else
+					{
+						junction.m_nStart 	= previousExon.getGenomicStop();
+						junction.m_nEnd		= exon.getGenomicStart();
+					}
+					
 					if(strIsoform.contains("UNKNOWN"))
 						junction.m_chStrand = '?';
 					else
 						junction.m_chStrand = dataSupplier.GetStrand();
 					String strJunctionName = (junction.m_nStart+1) + "-" + (junction.m_nEnd-1);
 					
-					if(clickEvent.m_strClickedA != null && clickEvent.m_strClickedA.equals("edge_"+nPreviousExonGrpID+"_"+nExonGrpID))
-					{
-						clrGradient = new GradientPaint((int)(nIntronStart+(nIntrnLength)*0.5), nY+7, clrGradient1, (int)(nIntronStart+(nIntrnLength)*0.5), nY+13, clrGradient2);
-					}
-					else if(clickEvent.m_strClickedA != null && clickEvent.m_strClickedA.equals("edge_"+nPreviousExonGrpID+"_"+nExonGrpID))
-					{
-						clrGradient = new GradientPaint((int)(nIntronStart+(nIntrnLength)*0.5), nY+7, clrGradient2, (int)(nIntronStart+(nIntrnLength)*0.5), nY+13, clrGradient1);
-					}
-					else
-					{
-						clrGradient = new GradientPaint((int)(nIntronStart+(nIntrnLength)*0.5), nY+7, clrGradient5, (int)(nIntronStart+(nIntrnLength)*0.5), nY+13, clrGradient6);
-					}
+					clrGradient = new GradientPaint((int)(nIntronStart+(nIntronLength)*0.5), nY+7, clrGradient5, (int)(nIntronStart+(nIntronLength)*0.5), nY+13, clrGradient6);
 					
 					if(m_bShowUniqueFeatures)
 					{
 						if(vcUniqueJunctions.contains(strJunctionName))
-							clrGradient = new GradientPaint((int)(nIntronStart+(nIntrnLength)*0.5), nY+7, clrGradient7, (int)(nIntronStart+(nIntrnLength)*0.5), nY+13, clrGradient8);
+							clrGradient = new GradientPaint((int)(nIntronStart+(nIntronLength)*0.5), nY+7, clrGradient7, (int)(nIntronStart+(nIntronLength)*0.5), nY+13, clrGradient8);
 					}
 					
 					bIsHighlighted = false;
@@ -2326,51 +2279,7 @@ public class PlotFactory
 							bIsHighlighted = true;
 					}
 
-					if(m_bColorJunctionPaths)
-					{
-						if(mapAnalysedJunctionPaths.containsKey(strIsoform))
-						{
-							TreeMap<Integer, TreeSet<String>> mapJunctionPath = mapAnalysedJunctionPaths.get(strIsoform); 
-							int nPathID = mapJunctionPath.firstKey();
-
-							String split[] = strJunctionName.split("-");
-							int nStart = Integer.parseInt(split[0].trim())-1;
-							int nEnd   = Integer.parseInt(split[1].trim())+1;							
-							if(mapJunctionPath.get(nPathID).contains(nStart + "_" + nEnd))
-							{
-								double fVal = CalculateRelativeJunctionExpressionPerCondition(nPathID).get(strSelectedCondition)*100.0;
-
-								if(fVal == 0.0 && !bIsHighlighted)
-								{
-									graph.setPaint(Color.WHITE);
-								}
-								else
-								{
-									int nColorValue = 255-(int)(fVal/100*255);
-									
-									Color clrExpressionLight = new Color(nColorValue, nColorValue, nColorValue);	// LIGHT color
-									nColorValue *= 0.8;
-									Color clrExpressionDark  = new Color(nColorValue, nColorValue, nColorValue);	// DARK color 
-									
-									clrGradient = new GradientPaint((int)(nX+nWidth*0.5), nY, clrExpressionLight, (int)(nX+nWidth*0.5), nY+20, clrExpressionDark);
-									graph.setPaint(clrGradient);
-								}
-
-								graph.fillRect(nIntronStart, nY+7, nIntrnLength, 6);
-							}
-							else if(m_bColorJunctionPaths)
-							{
-								graph.setPaint(Color.BLUE);
-								graph.fillRect(nIntronStart, nY+7, nIntrnLength, 6);
-							}
-						}
-						else
-						{
-							graph.setPaint(Color.WHITE);
-							graph.fillRect(nIntronStart, nY+7, nIntrnLength, 6);
-						}
-					}
-					else if(m_bColorExonsAndJunctionsByCoverage)
+					if(m_bColorExonsAndJunctionsByCoverage)
 					{
 						//##################################
 						//             add text
@@ -2415,7 +2324,7 @@ public class PlotFactory
 
 						nTextWidth = fontMetrics.stringWidth(strText);
 						nTextHeight = fontMetrics.getHeight();
-						graph.drawString(strText, nIntronStart + (int)(nIntrnLength*0.5) - (int)(nTextWidth*0.5), nY+18+nTextHeight);
+						graph.drawString(strText, nIntronStart + (int)(nIntronLength*0.5) - (int)(nTextWidth*0.5), nY+18+nTextHeight);
 						graph.setPaint(Color.BLACK);
 						
 						//##################################
@@ -2463,16 +2372,16 @@ public class PlotFactory
 					}
 					
 					// fill the junction
-					graph.fillRect(nIntronStart, nY+7, nIntrnLength, 6);
+					graph.fillRect(nIntronStart, nY+7, nIntronLength, 6);
 					
 					// intron border
 					graph.setColor(Color.BLACK);
-					graph.drawRect(nIntronStart, nY+7, nIntrnLength, 6);
+					graph.drawRect(nIntronStart, nY+7, nIntronLength, 6);
 					
 					area = new Area();
 					area.setId("edge_" + nPreviousExonGrpID + "_" + nExonGrpID + " " + strIsoform + " " + previousExon.getExonID() + " " + exon.getExonID());
 					area.setShape("rectangle");
-					area.setCoords(nIntronStart + ", " + (nY+7) + ", " + (nIntronStart+nIntrnLength) + ", " + (nY+13));
+					area.setCoords(nIntronStart + ", " + (nY+7) + ", " + (nIntronStart+nIntronLength) + ", " + (nY+13));
 										
 					String strToolTip = String.format(Locale.ENGLISH, "%s\nedge ex%d - ex%d\n%s: %,d - %,d", strIsoform, nPreviousExonGrpID, nExonGrpID, dataSupplier.GetReferenceName(), previousExon.getGenomicStop()+1, exon.getGenomicStart()-1);
 					area.setTooltiptext(strToolTip);
@@ -2481,6 +2390,7 @@ public class PlotFactory
 				
 				nPreviousExonGrpID 	= nExonGrpID;
 				nPreviousExonEnd 	= nX + nWidth;
+				previousExon		= exon;
 			}
 
 			//#######################################
@@ -2579,110 +2489,10 @@ public class PlotFactory
 			{
 				MouseEvent evnt = (MouseEvent) event;
 				evnt.stopPropagation();
-
-				// find selected exon groups
-				// get first and second selected exon position
-				ExonGroup SelectedExonGrpA = null;
-				ExonGroup SelectedExonGrpB = null;
 				
-				ClickEvent clickEvent		= m_app.GetClickEvent();
 				DataSupplier dataSupplier	= m_app.GetDataSupplier();
 
-				for(ExonGroup grp : dataSupplier.GetExonGroups())
-				{
-					if(grp.getGenomicStartOfGroup() >= clickEvent.m_nExonGroupStartA && grp.getGenomicStopOfGroup() <= clickEvent.m_nExonGroupEndA)
-					{
-						SelectedExonGrpA = grp;
-					}
-					
-					if(grp.getGenomicStartOfGroup() >= clickEvent.m_nExonGroupStartB && grp.getGenomicStopOfGroup() <= clickEvent.m_nExonGroupEndB)
-					{
-						SelectedExonGrpB = grp;
-					}
-				}
-				
-				if(evnt.getArea().startsWith("edge"))
-				{
-					clickEvent.m_strClickedA = evnt.getArea().split("\\s")[0];
-
-					clickEvent.m_nExonGroupStartA = -1;
-					clickEvent.m_nExonGroupEndA 	= -1;
-					
-					clickEvent.m_strClickedB 		= null;					
-					clickEvent.m_nExonGroupStartB = -1;
-					clickEvent.m_nExonGroupEndB 	= -1;
-				}
-				else if(evnt.getArea().startsWith("background_isoforms"))
-				{
-					clickEvent.m_strClickedA 		= null;
-					clickEvent.m_nExonGroupStartA = -1;
-					clickEvent.m_nExonGroupEndA 	= -1;
-					
-					clickEvent.m_strClickedB 		= null;					
-					clickEvent.m_nExonGroupStartB 	= -1;
-					clickEvent.m_nExonGroupEndB 	= -1;
-				}
-				else if(evnt.getArea().startsWith("exonic_part"))
-				{
-					m_app.ShowGTEXDataForExon(evnt.getArea());
-					return;
-				}
-				else if(evnt.getArea().startsWith("exon_group"))
-				{
-					String strExonGroupPosition = evnt.getArea().split("\\s")[2];
-					int nClickedGrpStart = Integer.parseInt(strExonGroupPosition.split("-")[0]);
-					int nClickedGrpEnd   = Integer.parseInt(strExonGroupPosition.split("-")[1]);
-					
-					if(clickEvent.m_strClickedA != null && evnt.getArea().contains("edge")) clickEvent.m_strClickedA = null;
-					if(clickEvent.m_strClickedB != null && evnt.getArea().contains("edge")) clickEvent.m_strClickedB = null;
-					
-					// unselect previously selected exon groups on reselect
-					boolean bReSelected = false;
-					String strClicked = evnt.getArea().split("\\s")[0] + " " + evnt.getArea().split("\\s")[1];
-					if(clickEvent.m_strClickedA != null && nClickedGrpStart == SelectedExonGrpA.getGenomicStartOfGroup() && nClickedGrpEnd == SelectedExonGrpA.getGenomicStopOfGroup())
-					{
-						if(clickEvent.m_strClickedB != null)
-						{
-							clickEvent.m_strClickedA 	= clickEvent.m_strClickedB;
-							
-							clickEvent.m_nExonGroupStartA = clickEvent.m_nExonGroupStartB;
-							clickEvent.m_nExonGroupEndA	= clickEvent.m_nExonGroupEndB;
-							
-							clickEvent.m_strClickedB 		= null;
-							clickEvent.m_nExonGroupStartB = -1;
-							clickEvent.m_nExonGroupEndB 	= -1;
-						}
-						else
-						{
-							clickEvent.m_strClickedA 		= null;
-							clickEvent.m_nExonGroupStartA = -1;
-							clickEvent.m_nExonGroupEndA 	= -1;
-						}
-						bReSelected = true;
-					}
-					
-					if(clickEvent.m_strClickedB != null && nClickedGrpStart == SelectedExonGrpB.getGenomicStartOfGroup() && nClickedGrpEnd == SelectedExonGrpB.getGenomicStopOfGroup())
-					{
-						clickEvent.m_strClickedB 		= null;
-						clickEvent.m_nExonGroupStartB = -1;
-						clickEvent.m_nExonGroupEndB 	= -1;
-						bReSelected = true;
-					}
-					
-					// select new exon
-					if(!bReSelected)
-					{
-						clickEvent.m_strClickedB = clickEvent.m_strClickedA;
-						clickEvent.m_strClickedA = strClicked;
-
-						clickEvent.m_nExonGroupStartB 	= clickEvent.m_nExonGroupStartA;
-						clickEvent.m_nExonGroupEndB		= clickEvent.m_nExonGroupEndA;
-						
-						clickEvent.m_nExonGroupStartA = nClickedGrpStart;
-						clickEvent.m_nExonGroupEndA 	= nClickedGrpEnd;
-					}
-				}
-				else if(evnt.getArea().startsWith("highlighted_exon_group"))
+				if(evnt.getArea().startsWith("highlighted_exon_group"))
 				{
 					String pSplit[] = evnt.getArea().split("\\s");
 					
@@ -2762,6 +2572,13 @@ public class PlotFactory
 		});
 	}
 	
+	/**
+	 *    Draws a heatmap of the junction coverage.
+	 *    Actually, two heatmaps are drawn. The first shows all junctions that pass the minimum junction coverage criteria and
+	 *    colors them relative to the highest covered junction.
+	 *    The second heatmap shows the same junctions but colors them relative to the highest value in each row, and uses an anova
+	 *    to identify junctions that show a high variance. Only p-values that pass BH-multiple testing correction are shown.
+	 */
 	public void DrawJunctionHeatmap() throws IOException
 	{
 		ProjectModel projectModel				= m_app.GetProjectModel();
@@ -2774,8 +2591,6 @@ public class PlotFactory
 			Messagebox.show("No gene selected!");
 			return;
 		}
-		
-		CreateCoverageMatrix();
 		
 		//###################################
 		//       prepare popup window
@@ -2895,7 +2710,7 @@ public class PlotFactory
 		int nOffsetX = nMargin + nNameOffset;
 		
 		//###################################################
-		// draw heatmap
+		//                   draw heatmap
 		//###################################################
 		int nY = 20;
 		
@@ -2948,6 +2763,11 @@ public class PlotFactory
 			nY += 20;
 		}
 		
+		
+		int nTmpY = nY+20;
+		int nTmpX = 0;
+		Vector<Double> vcPValues = new Vector<Double>(); // store anova p-values
+		
 		nY += 20;
 		for(CountElement jun : vcValidJunctions)
 		{
@@ -2968,11 +2788,11 @@ public class PlotFactory
 			graph.drawString(strText, nMargin, nY+fontMetrics.getHeight());
 			
 			int nX = nOffsetX;
-			Vector<double[]> vcCounts = new Vector<double[]>();
+			Vector<double[]> vcCounts = new Vector<double[]>();			
 			
 			for(String strCondition : mapSamplesToConditions.keySet())
 			{
-				int nCurSamples = mapCountsToSamples.keySet().size();
+				int nCurSamples = mapSamplesToConditions.get(strCondition).size();
 				double pCounts[] = new double[nCurSamples];
 				
 				int nIdx = 0;
@@ -3005,25 +2825,64 @@ public class PlotFactory
 				vcCounts.add(pCounts);
 			}
 			
-			// calculate anova		
+			nTmpX = nX;
+			
+			// calculate anova	
 			OneWayAnova anova = new OneWayAnova();
 			double fPValue = anova.anovaPValue(vcCounts);
 			
-			if(fPValue < 0.05)
-			{	
-				String strPath = Executions.getCurrent().getDesktop().getWebApp().getRealPath("/");
-				BufferedImage imgExclamation = ImageIO.read(new File(strPath + "/img/exclamation_sign.png"));
-				BufferedImage resizedImg = new BufferedImage(20, 18, BufferedImage.TYPE_INT_ARGB);
-				
-				Graphics2D g = resizedImg.createGraphics();
-				g.drawImage(imgExclamation, 0, 0, 20, 18, null);
-				g.dispose();				
-				
-				graph.drawImage(resizedImg, nX+5, nY, null);
-				
-				graph.setColor(Color.black);
-				graph.drawString(String.format(Locale.ENGLISH, "p.value %.3f", fPValue), nX+30, nY+13);
-			}			
+			// store p-value
+			vcPValues.add(fPValue);
+
+			nY += 20;
+		}
+			
+		//###################################
+		//    multiple testing correction
+		//###################################
+		int nTests = vcPValues.size();
+		
+		// create backup of p-vlaues to keep the order
+		Vector<Double> vcOrgPValues = new Vector<Double>();
+		vcOrgPValues.setSize(vcPValues.size());
+		Collections.copy(vcOrgPValues, vcPValues);
+		
+		// sort p-values ascendingly
+		Collections.sort(vcPValues);
+		
+		// find the last significant hit with highest p-value
+		double fThreshold = 0.0f;
+		for(int i=0; i<nTests; i++)
+		{
+			double fCriticalValue = ((double)i / (double)nTests) * 0.05;
+			double fPValue = vcPValues.get(i);
+	
+			if(fPValue < fCriticalValue)
+				fThreshold = fPValue;
+		}
+
+		// indicate significant p-values
+		nY = nTmpY;
+		for(double fPValue : vcOrgPValues)
+		{
+			if(fPValue > fThreshold)
+			{
+				nY += 20;
+				continue;
+			}
+			
+			String strPath = Executions.getCurrent().getDesktop().getWebApp().getRealPath("/");
+			BufferedImage imgExclamation = ImageIO.read(new File(strPath + "/img/exclamation_sign.png"));
+			BufferedImage resizedImg = new BufferedImage(20, 18, BufferedImage.TYPE_INT_ARGB);
+			
+			Graphics2D g = resizedImg.createGraphics();
+			g.drawImage(imgExclamation, 0, 0, 20, 18, null);
+			g.dispose();				
+			
+			graph.drawImage(resizedImg, nTmpX+5, nY, null);
+			
+			graph.setColor(Color.black);
+			graph.drawString(String.format(Locale.ENGLISH, "p.value %.3f", fPValue), nTmpX+30, nY+13);
 			
 			nY += 20;
 		}
@@ -3037,7 +2896,10 @@ public class PlotFactory
 		imgMap.setParent(layout);
 	}
 
-	public void BoxPlot(TreeMap<String, double[]> mapCountsToConditions, String strTitle, Graphics2D graph, int nX, int nY, int nHeight)
+	/**
+	 *    Generates a box plot for the given count arrays per condition. The plot will be located at nX/nX with height nHeight on the graph.
+	 */
+	public void BoxPlot(TreeMap<String, double[]> mapCountsToConditions, String strTitle, Graphics2D graph, int nX, int nY, int nHeight, String strAxisTitleY)
 	{
 		// settings for the box plot
 		int nBarWidth 	= 80;
@@ -3097,7 +2959,7 @@ public class PlotFactory
 		}
 		
 //		AddXAxis();
-		fMaxValue = AddYAxis(nX, nY, nHeight, fMaxValue, "Coverage", graph);
+		fMaxValue = AddYAxis(nX, nY, nHeight, fMaxValue, strAxisTitleY, graph);
 		
 		// add boxplots
 		j = 0;
@@ -3162,6 +3024,9 @@ public class PlotFactory
 		}
 	}
 	
+	/**
+	 *    Generates a 2D (XY) scatter plot using the counts specified for two junctions given as count arrays per condition. 
+	 */
 	public Vector<Area> Plot2D(TreeMap<String, double[]> mapCountsToConditionsX, TreeMap<String, double[]> mapCountsToConditionsY, Vector<String> vcDataLabels, String strAxisLabelX, String strAxisLabelY, String strTitle, Graphics2D graph, int nX, int nY, int nWidth, int nHeight, boolean bAxesInPercent)
 	{
 		Vector<Area> vcAreas = new Vector<Area>();
@@ -3202,8 +3067,8 @@ public class PlotFactory
 		//########################
 		//        add axes
 		//########################		
-		fMaxValueX = AddXAxis(nX, nY+nHeight, nWidth, fMaxValueX, "Coverage", graph);
-		fMaxValueY = AddYAxis(nX, nY, 		 nHeight, fMaxValueY, "Coverage", graph);
+		fMaxValueX = AddXAxis(nX, nY+nHeight, nWidth, fMaxValueX, strAxisLabelX, graph);
+		fMaxValueY = AddYAxis(nX, nY, 		 nHeight, fMaxValueY, strAxisLabelY, graph);
 
 		//########################
 		//   add data points
@@ -3243,7 +3108,12 @@ public class PlotFactory
 		return vcAreas;
 	}
 	
-	// ATTENTION: because the viewer was never intended to show close ups of splicing events, this function uses some workarounds and is thus rather complicated
+	/**
+	 *    Opens a popup window that zooms in on an alternative splicing event. The surrounding exons and the alternative exon are shown
+	 *    accompanied by a coverage plot above the exons (and some adjacent intron bases).
+	 *    ATTENTION: because the viewer was never intended to show zoomed in views of splicing events, this function uses some workarounds,
+	 *    is thus rather complicated and requires some simplifications.
+	 */
 	public void DrawSpliceJunctionCloseup(AnalysisResult result)
 	{
 		ProjectModel projectModel				= m_app.GetProjectModel();
@@ -3394,7 +3264,7 @@ public class PlotFactory
 		windowPopup.setParent(m_app);
 		windowPopup.setWidth(nMaxWidth +"px");
 		windowPopup.setHeight((nWindowHeight+20) +"px");
-		windowPopup.setTitle("Junction Heatmap");
+		windowPopup.setTitle("Detailed View");
 		windowPopup.setSizable(true);
 		windowPopup.setClosable(true);
 		windowPopup.setMaximizable(true);
@@ -3986,13 +3856,11 @@ public class PlotFactory
 				region.m_fEnd   += fIntronLength;
 			}
 		}
-		
-		/*
+/*		
 		System.out.println("regions before merging:");
 		for(Region reg : vcRegions)
 			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd);
-		*/
-		
+*/	
 		// merge overlapping regions (basespace)
 		boolean bMerged = true;
 		while(bMerged)
@@ -4010,8 +3878,8 @@ public class PlotFactory
 					// merge overlapping region
 					if(region.overlaps(region2))
 					{
-						region.m_fStart = region2.m_fStart;
-						region.m_fEnd   = region2.m_fEnd;
+						region.m_fStart = Math.min(region.m_fStart, region2.m_fStart);
+						region.m_fEnd   = Math.max(region.m_fEnd, region2.m_fEnd);
 						region.m_bIsLeftTerminalExon  = region.m_bIsLeftTerminalExon  | region2.m_bIsLeftTerminalExon;
 						region.m_bIsRightTerminalExon = region.m_bIsRightTerminalExon | region2.m_bIsRightTerminalExon;
 						region.m_fLength = region.m_fEnd - region.m_fStart +1;
@@ -4022,13 +3890,11 @@ public class PlotFactory
 				}
 			}
 		}
-	
-		/*
+/*	
 		System.out.println("regions after merging:");
 		for(Region reg : vcRegions)
 			System.out.println((int)reg.m_fStart + " - " + (int)reg.m_fEnd);
-		*/
-		
+*/
 		// combine length of regions and calculate the number of bases per pixel
 		fTotalRegionLengthInBp = 0;
 		for(Region region : vcRegions)
@@ -4219,7 +4085,7 @@ public class PlotFactory
 						continue;
 					
 					// get coverage for the whole gene
-					double pSampleCoverage[] = dataSupplier.GetCoverageArrayForGeneAndSample(strSample);
+					double pSampleCoverage[] = dataSupplier.GetGeneCoverageArrayForSample(strSample);
 					int nArrayStart = dataSupplier.GetGeneStart();
 					
 					// try to read coverage from file if necessary
@@ -4553,20 +4419,20 @@ public class PlotFactory
 		//######################################################
 		//                  draw box plots
 		//######################################################
-		nOffsetX = nMargin + 30;
+		nOffsetX = nMargin + 50;
 		nOffsetY = nMargin + 360;
 		
 		String strJunctionNameA = dataSupplier.GetReferenceName() + ":" + (result.GetInclusionJunctionStart()+1) + "-" + (result.GetInclusionJunctionEnd()-1);
 		String strJunctionNameB = dataSupplier.GetReferenceName() + ":" + (result.GetExclusionJunctionStart()+1) + "-" + (result.GetExclusionJunctionEnd()-1);
 		
 		// draw a plot for each junction and one plot for the ratios
-		BoxPlot(mapCountsToConditionsA, strJunctionNameA, graph, nOffsetX, nOffsetY, nPlotHeight);
+		BoxPlot(mapCountsToConditionsA, strJunctionNameA, graph, nOffsetX, nOffsetY, nPlotHeight, "Coverage");
 		nOffsetX += nBoxPlotWidth + nInterPlotDistance;
 		
-		BoxPlot(mapCountsToConditionsB, strJunctionNameB, graph, nOffsetX, nOffsetY, nPlotHeight);
+		BoxPlot(mapCountsToConditionsB, strJunctionNameB, graph, nOffsetX, nOffsetY, nPlotHeight, "Coverage");
 		nOffsetX += nBoxPlotWidth + nInterPlotDistance;
 	
-		BoxPlot(mapRatiosToConditions, "Ratio", graph, nOffsetX, nOffsetY, nPlotHeight);
+		BoxPlot(mapRatiosToConditions, "Ratio", graph, nOffsetX, nOffsetY, nPlotHeight, "Ratio");
 		nOffsetX += nBoxPlotWidth + nInterPlotDistance;
 		
 		Vector<Area> vcAreas = Plot2D(mapCountsToConditionsA, mapCountsToConditionsB, vcDataLabels, strJunctionNameA, strJunctionNameB, "2D plot", graph, nOffsetX, nOffsetY, n2DPlotWidth, nPlotHeight, false);
@@ -4583,6 +4449,10 @@ public class PlotFactory
 		}
 	}
 	
+	/**
+	 *    Similar to above, but instead of showing alternative splicing events that involve additional/missing exons, this plot
+	 *    focuses on retained introns (which also makes the plot function less complicated)
+	 */
 	public void DrawRetainedIntronCloseup(AnalysisResult result)
 	{
 		ProjectModel projectModel				= m_app.GetProjectModel();
@@ -4723,7 +4593,7 @@ public class PlotFactory
 					continue;
 				
 				// get coverage for the whole gene
-				double pSampleCoverage[] = dataSupplier.GetCoverageArrayForGeneAndSample(strSample);
+				double pSampleCoverage[] = dataSupplier.GetGeneCoverageArrayForSample(strSample);
 				
 				// get coverage for the specified region
 				for(int nPos=nBasePositionStart; nPos<=nBasePositionEnd; nPos++)
@@ -4888,6 +4758,7 @@ public class PlotFactory
 		imgMap.setParent(layout);
 	}
 	
+	/** Adds overlapping sense and antisense transcripts to the isoform plot */
 	public int DrawOverlappingTranscripts(int nX, int nY, int nIntronLength, double fShrinkageFactor, int nVerticalSpaceBetweenIsoforms, Graphics2D graph) throws FileNotFoundException
 	{
 		DataSupplier dataSupplier 				= m_app.GetDataSupplier();
@@ -5182,7 +5053,8 @@ public class PlotFactory
 		
 		return nY;
 	}
-		
+	
+	/** Returns a list of overlapping transcripts */
 	public TreeSet<Gene> GetOverlappingTranscripts() throws FileNotFoundException
 	{
 		DataSupplier dataSupplier 				= m_app.GetDataSupplier();
@@ -5219,6 +5091,7 @@ public class PlotFactory
 		return vcGenes;
 	}
 	
+	/** Invokes drawing of the coverage (if requested) and isoform plot */
 	public boolean DrawPlots() throws IOException, SQLException
 	{
 		DataSupplier dataSupplier = m_app.GetDataSupplier();
@@ -5230,7 +5103,6 @@ public class PlotFactory
 		}
 		
 		// clear old plots
-		m_app.GetPlotRegion().getChildren().clear();
 		m_app.GetIsoformPlotRegion().getChildren().clear();		
 		
 		if(m_bCoverageRequiresRedraw)

@@ -27,6 +27,11 @@ import org.apache.commons.math3.stat.inference.TTest;
 import BioKit.Exon;
 import BioKit.ExonGroup;
 
+/**
+ *    This class is used to identify retained introns in the data set.
+ *    The current workflow does not include reads that span exon-intron
+ *    borders, thus the analysis depends on coverage ratios only.
+ */
 public class AnalzyerRetainedIntrons {
 
 	public AlternativeSplicingHit IdentifyIntronRetentionEvents(SplicingWebApp app, AlternativeSplicingHit result, boolean bIgnoreFirstAndLastExons) throws IOException

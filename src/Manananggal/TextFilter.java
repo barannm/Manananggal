@@ -18,6 +18,9 @@ package Manananggal;
 
 import java.util.TreeSet;
 
+/**
+ *    Helper class used to add filters to the AS result list.
+ */
 public class TextFilter
 {
 	private TreeSet<String> m_vcStrings;

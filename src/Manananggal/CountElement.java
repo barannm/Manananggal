@@ -18,6 +18,12 @@ package Manananggal;
 
 import java.util.Vector;
 
+/**
+ *   The main purpose of the CountElement is to store the information
+ *   for a specific junction specified by reference name, start and
+ *   end position. It includes a vector with the count data for all
+ *   samples.
+ */
 public class CountElement implements Comparable<CountElement>
 {
 	String 	m_strRef;
@@ -60,11 +66,28 @@ public class CountElement implements Comparable<CountElement>
 			return false;
 	}
 	
-	// use this function when reading from single counts files
+	// use this function when reading from single count files
 	void ParseLine(String strLine)
 	{
 		String vcSplit[] = strLine.split("\t");
-		if(vcSplit.length < 9)
+		
+		// check if it's bed format
+		if(vcSplit.length == 6 || vcSplit.length == 7)
+		{
+			m_strRef	= vcSplit[0];
+			m_nStart	= Integer.parseInt(vcSplit[1]);
+			m_nEnd		= Integer.parseInt(vcSplit[2]);
+			m_strGeneID	= vcSplit[1].split("\\.")[3];
+			m_vcCounts.addElement(Integer.parseInt(vcSplit[4]));
+			m_chStrand  = vcSplit[5].charAt(0);
+			
+			// novel junction?
+			if(vcSplit.length == 7)
+			{
+				m_bKnown = Boolean.parseBoolean(vcSplit[6]);
+			}
+		}
+		else if(vcSplit.length < 9)
 		{
 			System.out.println("Could not parse splice junction: invalid formated line: " + strLine);
 			return;

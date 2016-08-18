@@ -23,6 +23,12 @@ import java.util.Vector;
 
 import org.apache.commons.math3.stat.StatUtils;
 
+/**
+ *    The Entropy factory calculates entropy values for tissue specific data.
+ *    By default, it will use the Gini index to identify genes or exonic parts
+ *    that are tissue specific, but other entropy functions for the Gini
+ *    Simpson index, Shannon index and Theil index were also implemented.
+ */
 public class EntropyFactory
 {
 	public TreeMap<String, Double> CalculateGiniIndexForExons(TreeMap<String, TreeMap<String, Vector<Double>>> mapCountsPerExonAndTissue)

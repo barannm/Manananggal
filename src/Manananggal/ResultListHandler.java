@@ -19,6 +19,7 @@ package Manananggal;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -60,10 +61,11 @@ import org.zkoss.zul.Textbox;
 import org.zkoss.zul.Vlayout;
 import org.zkoss.zul.Window;
 
-//######################################################
-//    This class handles the permanent and temporary
-//    result lists displayed in the GUI
-//######################################################
+/**
+ *    This class handles the permanent and temporary result lists displayed in the GUI.
+ *    It manages the filters and allows for transfer of temporary results to the permanent
+ *    result list.
+*/
 public class ResultListHandler
 {
 	private Tabs 				m_Tabs;
@@ -89,6 +91,7 @@ public class ResultListHandler
 		AddTemporaryResultList();
 	}
 
+	/** Clears all data in the result table */
 	public void Clear()
 	{
 		if(m_gridHitList != null)
@@ -102,6 +105,10 @@ public class ResultListHandler
 		}
 	}
 	
+	/**
+	 *    Adds a tab for the permanent (stored) AS results and
+	 *    a button to save the results to a file.
+	 */
 	private void AddPermanentResultList()
 	{
 		Tab tab = new Tab("Curated AS Results");
@@ -117,15 +124,12 @@ public class ResultListHandler
 		m_gridHitList = new Grid();
 		m_gridHitList.setId("hitlist");
 		m_gridHitList.setParent(layoutV);
-//		m_gridHitList.setWidth("830px");
 		m_gridHitList.setHeight("380px");
 		m_gridHitList.setVflex("min");
 		m_gridHitList.setHflex("min");
 		m_gridHitList.setMold("paging");
 		m_gridHitList.setPageSize(10);
 		
-//		String strHeight = Integer.parseInt(m_gridHitList.getHeight().replace("px", "")) + 60 + "px";
-//		layoutV.setHeight(strHeight);
 		layoutV.setHeight("440px");
 		
 		Button btnSaveHitList = new Button("Save changes");
@@ -144,6 +148,11 @@ public class ResultListHandler
 		});
 	}
 	
+	/**
+	 *    Adds a tab for the temporary AS results and adds a
+	 *    button to transfer temporary AS results to the permanent
+	 *    AS result list.
+	 */
 	private void AddTemporaryResultList()
 	{
 		Tab tab = new Tab("Temporary AS Results");
@@ -159,15 +168,12 @@ public class ResultListHandler
 		m_gridTmpHitList = new Grid();
 		m_gridTmpHitList.setId("tmpHitList");
 		m_gridTmpHitList.setParent(layoutV);
-//		m_gridTmpHitList.setWidth("830px");
 		m_gridTmpHitList.setHeight("380px");
 		m_gridTmpHitList.setVflex("min");
 		m_gridTmpHitList.setHflex("min");
 		m_gridTmpHitList.setMold("paging");
 		m_gridTmpHitList.setPageSize(10);
-		
-//		String strHeight = Integer.parseInt(m_gridTmpHitList.getHeight().replace("px", "")) + 60 + "px";
-//		layoutV.setHeight(strHeight);
+
 		layoutV.setHeight("440px");
 		
 		Button btnSaveHitList = new Button("Add selection to curated results");
@@ -206,13 +212,14 @@ public class ResultListHandler
 				
 				m_resultHandler.AddCuratedResults(vcResults);
 				UpdatePermanentResultList(m_resultHandler);
-				
-//				m_vcASResults.AddTemporaryResults(vcResults);
-//				Messagebox.show("Results saved.");
 			}
 		});
 	}
-	
+
+	/**
+	 *    Adds the menu for the splicing type filter to the corresponding
+	 *    column in the result table.
+	 */
 	private void AddSplicingTypeFilter(Column parent)
 	{		
 		Bandbox bandBox = new Bandbox();
@@ -378,6 +385,10 @@ public class ResultListHandler
 			item.setSelected(true);
 	}
 
+	/**
+	 *    Adds a menu for the result type filter to the corresponding
+	 *    column in the result table.
+	 */
 	private void AddResultTypeFilter(Column parent)
 	{		
 		Bandbox bandBox = new Bandbox();
@@ -480,6 +491,12 @@ public class ResultListHandler
 			item.setSelected(true);
 	}
 
+	/**
+	 *    Adds a menu to filter for strings in a given column of the
+	 *    result table. Because multiple string filters exist, each
+	 *    requires a unique ID that is specified by the filter ID.
+	 *    See ResultFilterRule for valid filter IDs.
+	 */
 	private void AddStringFilter(Column parent, int nFilterID)
 	{
 		TreeSet<String> vcStrings = m_resultFilterRule.GetTextFilter(nFilterID).GetStrings();
@@ -582,6 +599,12 @@ public class ResultListHandler
 		}
 	}
 
+	/**
+	 *    Adds a menu to filter for values in a given column of the
+	 *    result table. Because multiple number filters exist, each
+	 *    requires a unique ID that is specified by the filter ID.
+	 *    See ResultFilterRule for valid filter IDs.
+	 */
 	private void AddNumberFilter(Component parent, int nFilterID)
 	{
 		Bandbox bandBox = new Bandbox();
@@ -673,6 +696,14 @@ public class ResultListHandler
 		});
 	}
 	
+	/**
+	 *    Updates the contents of the permanent result list.
+	 *    This function adds the table to the permanent result list tab
+	 *    and fills it with data.
+	 *    It is invoked when a new project is opened or if the visible 
+	 *    contents of the result table changes (e.g. by changing the
+	 *    filter rules).
+	 */
 	public void UpdatePermanentResultList(AnalysisResultHandler resultHandler) throws ClassNotFoundException, InstantiationException, IllegalAccessException
 	{
 		// update results
@@ -728,7 +759,6 @@ public class ResultListHandler
 		//           add header
 		//##################################
 		Columns cols = new Columns();
-	//	cols.setMenupopup("auto");
 		
 		// image for result removal
 		Column col = new Column("");
@@ -1243,6 +1273,11 @@ public class ResultListHandler
 		colPSI.sort(true);
 	}
 	
+	/**
+	 *    This function is invoked by clicking the 'detail icon'
+	 *    located in front of each result. It opens a popup window
+	 *    that shows some detailed information on the event.
+	 */
 	public void ShowDetailPopup(AnalysisResult res)
 	{		
 		NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
@@ -1419,7 +1454,7 @@ public class ResultListHandler
 				Graphics2D graph = img.createGraphics();
 				graph.setColor(Color.WHITE);
 				graph.fillRect(0, 0, nPlotWidth+40, 360);
-				m_App.m_plotFactory.BoxPlot(mapRatios, "Ratios " + ex.m_nStart+"-"+ex.m_nEnd, graph, 30, 30, 300);
+				m_App.m_plotFactory.BoxPlot(mapRatios, "Ratios " + ex.m_nStart+"-"+ex.m_nEnd, graph, 30, 30, 300, "Ratio");
 				
 				Imagemap imgMap = new Imagemap();
 				imgMap.setWidth(nPlotWidth+40 + "px");
@@ -1591,57 +1626,62 @@ public class ResultListHandler
 			int nSpacer   	= 20;
 			int nTotalBarDistance = nBarWidth+nSpacer;
 			int nPlotWidth = nTotalBarDistance*2+40;
+			int nXOffset = 60;
 			
 			String strJunctionNameA = dataSupplier.GetReferenceName() + ":" + (score.m_JunctionInclusion.m_nStart+1) + "-" + (score.m_JunctionInclusion.m_nEnd-1);
 			String strJunctionNameB = dataSupplier.GetReferenceName() + ":" + (score.m_JunctionExclusion.m_nStart+1) + "-" + (score.m_JunctionExclusion.m_nEnd-1);
 			
-			BufferedImage img = new BufferedImage(nPlotWidth+50, 360, BufferedImage.TYPE_INT_RGB);
+			BufferedImage img = new BufferedImage(nPlotWidth+nXOffset, 360, BufferedImage.TYPE_INT_RGB);
 			Graphics2D graph = img.createGraphics();
+			graph.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			graph.setColor(Color.WHITE);
-			graph.fillRect(0, 0, nPlotWidth+50, 360);
-			m_App.m_plotFactory.BoxPlot(mapCountsToConditionsA, "junction: " + strJunctionNameA, graph, 40, 30, 300);
+			graph.fillRect(0, 0, nPlotWidth+nXOffset, 360);
+			m_App.m_plotFactory.BoxPlot(mapCountsToConditionsA, "junction: " + strJunctionNameA, graph, nXOffset, 30, 300, "Coverage");
 			
 			Imagemap imgMap = new Imagemap();
-			imgMap.setWidth(nPlotWidth+50 + "px");
+			imgMap.setWidth(nPlotWidth+nXOffset + "px");
 			imgMap.setHeight("360px");
 			imgMap.setContent(img);
 			imgMap.setParent(grpBox);
 			
-			img = new BufferedImage(nPlotWidth+50, 360, BufferedImage.TYPE_INT_RGB);
+			img = new BufferedImage(nPlotWidth+nXOffset, 360, BufferedImage.TYPE_INT_RGB);
 			graph = img.createGraphics();
+			graph.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			graph.setColor(Color.WHITE);
-			graph.fillRect(0, 0, nPlotWidth+50, 360);
-			m_App.m_plotFactory.BoxPlot(mapCountsToConditionsB, "junction: " + strJunctionNameA, graph, 40, 30, 300);
+			graph.fillRect(0, 0, nPlotWidth+nXOffset, 360);
+			m_App.m_plotFactory.BoxPlot(mapCountsToConditionsB, "junction: " + strJunctionNameA, graph, nXOffset, 30, 300, "Coverage");
 			
 			imgMap = new Imagemap();
-			imgMap.setWidth(nPlotWidth+50 + "px");
+			imgMap.setWidth(nPlotWidth+nXOffset + "px");
 			imgMap.setHeight("360px");
 			imgMap.setContent(img);
 			imgMap.setParent(grpBox);
 			
-			img = new BufferedImage(nPlotWidth+50, 360, BufferedImage.TYPE_INT_RGB);
+			img = new BufferedImage(nPlotWidth+nXOffset, 360, BufferedImage.TYPE_INT_RGB);
 			graph = img.createGraphics();
+			graph.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			graph.setColor(Color.WHITE);
-			graph.fillRect(0, 0, nPlotWidth+50, 360);
-			m_App.m_plotFactory.BoxPlot(mapRatiosToConditions, "Ratios", graph, 30, 30, 300);
+			graph.fillRect(0, 0, nPlotWidth+nXOffset, 360);
+			m_App.m_plotFactory.BoxPlot(mapRatiosToConditions, "Ratios", graph, nXOffset, 30, 300, "Ratio");
 			
 			imgMap = new Imagemap();
-			imgMap.setWidth(nPlotWidth+50 + "px");
+			imgMap.setWidth(nPlotWidth+nXOffset + "px");
 			imgMap.setHeight("360px");
 			imgMap.setContent(img);
 			imgMap.setParent(grpBox);
 			
-			nPlotWidth = 400;
+			nPlotWidth = 300+100;
 			
-			img = new BufferedImage(nPlotWidth+50, 480, BufferedImage.TYPE_INT_RGB);
+			img = new BufferedImage(nPlotWidth, 400, BufferedImage.TYPE_INT_RGB);
 			graph = img.createGraphics();
+			graph.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			graph.setColor(Color.WHITE);
-			graph.fillRect(0, 0, nPlotWidth+50, 480);
-			Vector<Area> vcAreas = m_App.m_plotFactory.Plot2D(mapCountsToConditionsA, mapCountsToConditionsB, vcDataLabels, strJunctionNameA, strJunctionNameB, "2D plot", graph, 40, 30, nPlotWidth, 400, false);
+			graph.fillRect(0, 0, nPlotWidth, 400);
+			Vector<Area> vcAreas = m_App.m_plotFactory.Plot2D(mapCountsToConditionsA, mapCountsToConditionsB, vcDataLabels, strJunctionNameA, strJunctionNameB, "2D plot", graph, nXOffset, 30, 300, 300, false);
 			
 			imgMap = new Imagemap();
-			imgMap.setWidth(nPlotWidth+50 + "px");
-			imgMap.setHeight("480px");
+			imgMap.setWidth(nPlotWidth + "px");
+			imgMap.setHeight("400px");
 			imgMap.setContent(img);
 			imgMap.setParent(grpBox);
 			
@@ -1652,6 +1692,13 @@ public class ResultListHandler
 		}
 	}
 	
+	/**
+	 *    Updates the contents of the temporary result list.
+	 *    This function adds the table to the temporary result list tab
+	 *    and fills it with data.
+	 *    It is invoked each time a new gene is selected, the "reanalyze"
+	 *    button is clicked or if the filter rules change.
+	 */
 	public void UpdateTemporaryResultList(AnalysisResultHandler resultHandler) throws ClassNotFoundException, InstantiationException, IllegalAccessException
 	{
 		// update results
@@ -2232,6 +2279,7 @@ public class ResultListHandler
 		colPSI.sort(true);
 	}
 
+	/** Helper function used to sort rows by ascending user ratings. */
 	private Comparator<Row> getAscRatingComparator()
 	{
 		return new Comparator<Row>()
@@ -2252,6 +2300,7 @@ public class ResultListHandler
 		};
 	}
 	
+	/** Helper function used to sort rows by descending user ratings */
 	private Comparator<Row> getDescRatingComparator()
 	{
 		return new Comparator<Row>()
@@ -2272,6 +2321,10 @@ public class ResultListHandler
 		};
 	}
 
+	/**
+	 *    Helper function used to sort the rows in descending order
+	 *    by the value specified in the column nIdx.
+	 */
 	private Comparator<Row> getDescNumberComparator(int nIdx)
 	{	
 		final int m_nIdx = nIdx;
@@ -2309,6 +2362,10 @@ public class ResultListHandler
 		};
 	}
 	
+	/**
+	 *    Helper function used to sort the rows in ascending order
+	 *    by the value specified in the column nIdx.
+	 */
 	private Comparator<Row> getAscNumberComparator(int nIdx)
 	{
 		final int m_nIdx = nIdx;
@@ -2326,8 +2383,8 @@ public class ResultListHandler
 				
 				if(!strValue1.equals("NA") && !strValue2.equals("NA"))
 				{
-					double fValue1 = Double.parseDouble(strValue1);//new BigDecimal(strValue1).longValueExact();
-					double fValue2 = Double.parseDouble(strValue2);//new BigDecimal(strValue2).longValueExact();
+					double fValue1 = Double.parseDouble(strValue1);
+					double fValue2 = Double.parseDouble(strValue2);
 					
 					if(fValue1 > fValue2)
 						return +1;

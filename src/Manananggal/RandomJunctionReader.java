@@ -26,12 +26,15 @@ import java.util.Arrays;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.zkoss.zul.Messagebox;
-
-import BioKit.Gene;
-
+/**
+ *    The RandomJunctionReader reads data from binary count files.
+ *    - NOTE: I should move some functions for writing the binary
+ *            count files from the projectModel into this class
+ *            and call it a WriterReader. 
+ */
 public class RandomJunctionReader
 {
+	/** Helper class used to index the binary junction count file */
 	private class Index implements Comparable<Index>
 	{
 		String	m_strKey;
@@ -327,116 +330,11 @@ public class RandomJunctionReader
 */
 	}
 	
-	// strand is either -1 (-), 0 (?) or +1 (+)
-	public TreeMap<String, TreeMap<String, Integer>> GetJunctionsForRange(String strRef, int nStart, int nEnd, int nStrand) throws IOException
-	{	
-		// for each junction (1st key = string) store the read counts (values) per sample (2nd key)
-		TreeMap<String, TreeMap<String, Integer>> vcResult = new TreeMap<String, TreeMap<String, Integer>>();
-		
-		RandomAccessFile pIn = null;
-		
-		// open input file
-		try
-		{
-			pIn = new RandomAccessFile(m_strFileName, "r");
-		}
-		catch(IOException ex)
-		{
-			Messagebox.show("failed to open file: " + m_strFileName);
-			System.out.println("failed to open file: " + m_strFileName);
-			System.out.println(ex.getMessage());
-			return null;
-		}
-		
-		if(pIn.length() == 0)
-		{
-			Messagebox.show("ERROR: Empty merged junction count file!");
-			System.out.println("ERROR: Empty merged junction count file!");
-			pIn.close();
-			return null;
-		}
-
-		long nTotalFileLength = pIn.length();
-		
-		TreeMap<String, Integer> mapIdxToSamples = new TreeMap<String, Integer>();
-		int nSamples = pIn.readInt();
-		for(int i=0; i<nSamples; i++)
-		{
-			mapIdxToSamples.put(pIn.readUTF(), i);
-		}
-
-		idx_loop:
-		for(Index idx : m_vcIndices)
-		{
-			if(!idx.m_strRef.equals(strRef))
-				continue;
-			
-			if(idx.m_nEnd < nStart)
-				continue;
-			
-			if(idx.m_nStart > nEnd)
-				break;
-
-			pIn.seek(idx.m_nOffset);
-			
-			while(pIn.getFilePointer() < nTotalFileLength)
-			{
-				String strCurRef = pIn.readUTF();
-				int nCurStart = pIn.readInt();
-				int nCurEnd   = pIn.readInt();
-				
-				pIn.readBoolean(); 	// skip known/unknown
-				pIn.readUTF();		// skip geneID
-				char chStrand = pIn.readChar();
-				
-				if(nCurStart > nEnd || !strCurRef.equals(strRef))
-					break idx_loop;
-				
-				if(nCurStart <= nEnd && nCurEnd >= nStart)
-				{
-					TreeMap<String, Integer> mapCounts = new TreeMap<String, Integer>();
-
-					byte pBuffer[] = new byte[mapIdxToSamples.keySet().size()*4];
-					pIn.read(pBuffer);
-					
-					IntBuffer pBufferInt = ByteBuffer.wrap(pBuffer).asIntBuffer();
-					int pCounts[] = new int[mapIdxToSamples.keySet().size()];
-					pBufferInt.get(pCounts);
-					
-//					int pCounts[] = ByteBuffer.wrap(pBuffer).asIntBuffer().array();
-					
-
-					int i=0;
-					for(String strSample : mapIdxToSamples.keySet())
-					{
-//						mapCounts.put(strSample, pIn.readInt());
-						mapCounts.put(strSample, pCounts[i]);
-						i++;
-					}
-				
-					if(nStrand != 0)
-					{
-						if(chStrand == '?' || (nStrand == +1 && chStrand == '+') || (nStrand == -1 && chStrand == '-'))
-							vcResult.put(nCurStart + "_" + nCurEnd, mapCounts);
-					}
-					else
-					{
-						vcResult.put(nCurStart + "_" + nCurEnd, mapCounts);
-					}
-				}
-				else
-				{
-					// skip junction
-					pIn.seek(pIn.getFilePointer() + mapIdxToSamples.keySet().size()*4);
-				}
-			}
-		}
-
-		pIn.close();
-		
-		return vcResult;
-	}
-
+	/**
+	 *    Retrieves counts of split reads for a given genomic range.
+	 *    The output junctions are returned as CountElements.
+	 *    The valid nStrand values are -1 (-), 0 (?) and +1 (+).
+	 */
 	public TreeMap<CountElement, TreeMap<String, Integer>> GetJunctionsForRangeAsCountElements(String strRef, int nStart, int nEnd, int nStrand) throws IOException
 	{	
 		// for each junction (1st key = string) store the read counts (values) per sample (2nd key)
@@ -538,17 +436,4 @@ public class RandomJunctionReader
 		
 		return vcResult;
 	}
-	
-	public TreeMap<String, TreeMap<String, Integer>> GetJunctionsForGene(Gene gene) throws IOException
-	{
-		TreeMap<String, TreeMap<String, Integer>> vcRes = null;
-		
-		if(gene.isPlusStrand())
-			vcRes = GetJunctionsForRange(gene.getChromosome(), gene.getStart(), gene.getStop(), +1);
-		else
-			vcRes = GetJunctionsForRange(gene.getChromosome(), gene.getStart(), gene.getStop(), -1);
-		
-		return vcRes;
-	}
-
 }
