@@ -96,8 +96,7 @@ public class PlotFactory
 	private boolean					m_bShowAmbigiousUniqueExons;    // color exons for which coverage could not be determine unambiguously
 	private boolean					m_bShowCoverageGrid;            // show the light grey grid in the coverage window
 	private boolean					m_bSwitchStrands; 	            // flip the image (second strand transcripts will be drawn from left to right)
-	
-	private boolean					m_bShowSecondCoveragePlot;      // adds a second coverage plot that is attached to the isoform plot
+
 	private boolean					m_bColorExonsAndJunctionsByCoverage; // color exons and junctions based on their coverage values
 
 	TreeSet<CountElement>			m_vcUnknownJunctions;	// junctions that do not match any known isoform
@@ -177,7 +176,6 @@ public class PlotFactory
 		m_bCoveragePlotShowQuartiles			= true;		
 		
 		m_bShowCoverageGrid						= true;
-		m_bShowSecondCoveragePlot				= false;
 		m_bColorExonsAndJunctionsByCoverage		= true;
 		
 		m_bCoverageRequiresRedraw				= true;
@@ -292,12 +290,6 @@ public class PlotFactory
 		m_bCoveragePlotShowQuartiles = bState;
 	}
 	
-	/** Adds a second coverage plot directly above the isoform plot that allows synchronized scrolling */
-	public void ShowSecondCoveragePlot(boolean bState)
-	{
-		m_bShowSecondCoveragePlot = bState;
-	}
-	
 	/** Highlight unique isoform elements (e.g. exons only present in a single isoform) */
 	public void ShowUniqueFeatures(boolean bState)
 	{
@@ -380,12 +372,6 @@ public class PlotFactory
 	public boolean IsQuartilesEnabled()
 	{
 		return m_bCoveragePlotShowQuartiles;
-	}
-	
-	/** Returns whether a coverage plot should be added to the isoform plot */
-	public boolean IsSecondCoveragePlotEnabled()
-	{
-		return m_bShowSecondCoveragePlot;
 	}
 	
 	/** Retrives the color selection from the SplicingWebApp and stores it in the member variable m_mapColorsToConditions */
@@ -772,10 +758,7 @@ public class PlotFactory
 		//                 prepare graph
 		//######################################################
 		DrawingOffsets offsets = ComputeDrawingOffsets();
-		
-		// we don't have to adjust for MMSeq offsets here
-		offsets.m_nTotalWidth -= offsets.m_nMMSeqTextLength;
-		
+
 		int nPlotHeight = 200;
 		int nMargin 	= 10;
 		int nSpacer		= 20;
@@ -1302,17 +1285,6 @@ public class PlotFactory
 
 				nOffsetX += nWidth + offsets.m_nIntronLength;
 			}
-		}
-
-		// Show second coverage plot attached to the isoform plot
-		if(m_bShowSecondCoveragePlot)
-		{
-			Imagemap imgMap = new Imagemap();
-			imgMap.getChildren().clear();
-			imgMap.setWidth(offsets.m_nTotalWidth+"px");
-			imgMap.setHeight(nMaxHeight+"px");
-			imgMap.setContent(img);
-			imgMap.setParent(m_app.GetIsoformPlotRegion());
 		}
 
 		if(bAsPopupWindow)
@@ -2474,7 +2446,7 @@ public class PlotFactory
 		imgMapIsoforms.setContent(img);
 
 		Vlayout layoutIsoformPlot = m_app.GetIsoformPlotRegion();
-		layoutIsoformPlot.setHeight("100%");
+//		layoutIsoformPlot.setHeight("100%");
 		imgMapIsoforms.setParent(layoutIsoformPlot);
 		
 		Area areaBackground = new Area();

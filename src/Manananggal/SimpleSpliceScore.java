@@ -112,19 +112,19 @@ public class SimpleSpliceScore implements Comparable<SimpleSpliceScore>
 		String strType = "?";
 		switch(m_nType)
 		{
-			case SplicingWebApp.AS_TYPE_EXON_SKIPPING: 			strType = "exn_skipping"; 			break;
-			case SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN: 	strType = "alt_start_unique_jun"; 	break;
-			case SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN: 	strType = "alt_end_unique_jun"; 	break;
-			case SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN: 	strType = "alt_start_shared_jun"; 	break;
-			case SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN: 	strType = "alt_end_shared_jun"; 	break;
-			case SplicingWebApp.AS_TYPE_RETAINED_INTRON:		strType = "retained_intron";		break;
+			case SplicingWebApp.AS_TYPE_EXON_SKIPPING: 					strType = "exn_skipping"; 					break;
+			case SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN: 			strType = "alt_start_unique_jun"; 			break;
+			case SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN: 			strType = "alt_end_unique_jun"; 			break;
+			case SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN: 			strType = "alt_start_shared_jun"; 			break;
+			case SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN: 			strType = "alt_end_shared_jun"; 			break;
+			case SplicingWebApp.AS_TYPE_RETAINED_INTRON:				strType = "retained_intron";				break;
 			case SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE: 	strType = "alt_start_unique_jun_double"; 	break;
 			case SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE: 		strType = "alt_end_unique_jun_double"; 		break;
 			case SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN_DOUBLE: 	strType = "alt_start_shared_jun_double"; 	break;
 			case SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN_DOUBLE: 		strType = "alt_end_shared_jun_double"; 		break;
 			case SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END:			strType = "alt_3_prime_exon_end";			break;
 			case SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END:			strType = "alt_5_prime_exon_end";			break;
-			default: strType = "" + m_nType; 			break;
+			default:													strType = "" + m_nType; 					break;
 		}
 		
 		return strType;

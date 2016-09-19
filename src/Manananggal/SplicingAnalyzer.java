@@ -89,10 +89,10 @@ public class SplicingAnalyzer
 				double	fMergingJunctions_MinAverageCount			= Double.parseDouble(args[4]);
 				int		nMergingJunctions_minCoverageSingleSample 	= Integer.parseInt(args[5]);
 				
-				project.Init(strProject, nMergingJunctions_minSamples, nMergingJunctions_minSampleCoverage, fMergingJunctions_MinAverageCount, nMergingJunctions_minCoverageSingleSample, true);
+				project.Init(strProject, nMergingJunctions_minSamples, nMergingJunctions_minSampleCoverage, fMergingJunctions_MinAverageCount, nMergingJunctions_minCoverageSingleSample, true, false);
 			}
 			else
-				project.Init(strProject, -1, -1, -1, -1, true);
+				project.Init(strProject, -1, -1, -1, -1, true, false);
 		}
 		else if(args.length == 3 && args[0].trim().equals("calculate_size_factors"))
 		{
@@ -134,7 +134,7 @@ public class SplicingAnalyzer
 	public static void CalculateSingleSampleExonInclusionRate(String strProject, String strFileExons, String strFileGTF) throws Exception
 	{
 		ProjectModel project = new ProjectModel();
-		project.Init(strProject, -1, -1, -1, -1, false);
+		project.Init(strProject, -1, -1, -1, -1, false, false);
 		
 		TreeMap<String, String> mapBigWigFiles = project.GetBigWigFilesForSamples();
 		

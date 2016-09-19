@@ -21,8 +21,11 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.TreeSet;
+import java.util.Vector;
 
 import BioKit.Exon;
 
@@ -46,6 +49,10 @@ import BioKit.Exon;
 */
 public class AnalysisResult implements Comparable<AnalysisResult>
 {
+	static final int RESULT_EVIDENCE_TYPE_COMBINED			= 1;
+	static final int RESULT_EVIDENCE_TYPE_RATIO_ONLY		= 2;
+	static final int RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY	= 3;
+	
 	private int				m_nRating;
 	private String			m_strRef;
 	private String			m_strGeneID;
@@ -57,19 +64,24 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 	private TreeSet<String> m_vcSelectedIsoforms;
 	private String 			m_strFileGTF;
 	private String 			m_strComment;
+	
+	// the following attributes are for foreign AS results (e.g. DEXSeq, rMATS, etc.)
+	private int				m_nResultSource;
+	private double			m_fImportedDataPValue;
+	private double 			m_fImportedDataPAdjusted;
+	private double 			m_fImportedDataFDR;
+	private double 			m_fImportedDataLog2FC;
 
 	private int							m_nType;
 	private int 						m_nID;
 	private AlternativeSplicingExon 	m_altExonRatioChangeA;
 	private AlternativeSplicingExon 	m_altExonRatioChangeB;	// only used for alternative terminal exons
-	private SimpleSpliceScore 			m_spliceScore;
-	
-	static final int RESULT_EVIDENCE_TYPE_COMBINED			= 1;
-	static final int RESULT_EVIDENCE_TYPE_RATIO_ONLY		= 2;
-	static final int RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY	= 3;
+	private SimpleSpliceScore 			m_spliceScore;	
 	
 	public AnalysisResult()
 	{
+		m_nResultSource			= -1;
+		
 		m_nRating 				= 0;
 		m_nID 					= -1;
 		m_altExonRatioChangeA	= null;
@@ -86,11 +98,18 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		m_strFileGTF			= "";
 		m_strComment			= "";
 		
+		m_fImportedDataPValue				= Double.MAX_VALUE;
+		m_fImportedDataPAdjusted			= Double.MAX_VALUE;
+		m_fImportedDataFDR					= Double.MAX_VALUE;
+		m_fImportedDataLog2FC				= 0.0f;
+		
 		m_vcSelectedIsoforms	= new TreeSet<String>();
 	}
 	
 	public AnalysisResult(AnalysisResult res)
 	{
+		m_nResultSource			= res.m_nResultSource;
+		
 		m_nRating 				= res.m_nRating;
 		m_nID 					= res.m_nID;
 		m_altExonRatioChangeA	= res.m_altExonRatioChangeA;
@@ -112,12 +131,19 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		m_fMinCoveredBases		= res.m_fMinCoveredBases;
 		m_fVariableExonThreshold= res.m_fVariableExonThreshold;
 		
+		m_fImportedDataPValue				= res.m_fImportedDataPValue;
+		m_fImportedDataPAdjusted 			= res.m_fImportedDataPAdjusted;
+		m_fImportedDataFDR					= res.m_fImportedDataFDR;
+		m_fImportedDataLog2FC				= res.m_fImportedDataLog2FC;
+		
 		m_vcSelectedIsoforms	= new TreeSet<String>();
 		m_vcSelectedIsoforms.addAll(res.m_vcSelectedIsoforms);
 	}
 
 	public AnalysisResult(SplicingWebApp app, int nID, String strRef, String strGeneID, String strGeneSymbol, AlternativeSplicingExon altExonRatioChangeA, AlternativeSplicingExon altExonRatioChangeB, SimpleSpliceScore spliceScore)
 	{
+		m_nResultSource			= -1;
+		
 		m_nID 					= nID;
 		m_strRef				= strRef;
 		m_strGeneID				= strGeneID;
@@ -131,6 +157,11 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		m_nMinCovPerBase		= app.GetMinimumCoveragePerBase();
 		m_fMinCoveredBases		= app.GetMinimumCoveredBases();
 		m_fVariableExonThreshold = app.GetVariableExonThreshold();
+		
+		m_fImportedDataPValue		= Double.MAX_VALUE;
+		m_fImportedDataPAdjusted 	= Double.MAX_VALUE;
+		m_fImportedDataFDR			= Double.MAX_VALUE;
+		m_fImportedDataLog2FC		= 0;
 		
 		m_vcSelectedIsoforms 	= new TreeSet<String>();
 		for(String strIsoform : app.GetValidIsoforms())
@@ -173,6 +204,12 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 			strOut += String.format(Locale.ENGLISH, "\t%s\t-\t-\t-\t-\t-\t-\t-\t-\t-", m_spliceScore.GetTypeAsString());
 			strOut += String.format(Locale.ENGLISH, "\t%d\t%d\t%d\t%d\t%.2f\t%.3e\t%s\t%b", m_spliceScore.m_JunctionInclusion.m_nStart+1, m_spliceScore.m_JunctionInclusion.m_nEnd-1, m_spliceScore.m_JunctionExclusion.m_nStart+1, m_spliceScore.m_JunctionExclusion.m_nEnd-1, m_spliceScore.m_fInclusionChange, m_spliceScore.m_fPValue, m_spliceScore.m_bSignificant, m_spliceScore.m_bIsNovel); 
 		}
+		
+		if(m_fImportedDataPValue != Double.MAX_VALUE)
+		{
+			strOut += "\t[" + m_fImportedDataPValue + "\t" + m_fImportedDataPAdjusted + "\t" + m_fImportedDataFDR + "\t" + m_fImportedDataLog2FC + "]";
+		}
+		
 		return strOut;
 	}
 	
@@ -584,8 +621,28 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		return vcResult;
 	}
 	
-	public String GetTypeAsString()
+	public String GetASTypeAsString()
 	{
+		// if there is no type set for the alternative exon, use the splice score type
+		if(m_altExonRatioChangeA == null)
+		{
+			if(m_spliceScore == null)
+				return "?";
+			else
+				return m_spliceScore.GetTypeAsString();
+		}
+		
+		String strType = m_altExonRatioChangeA.GetTypeAsString();
+		
+		// if the type of the alternative exon was undefined (e.g. just the type number)
+		// try to use the splice score type
+		if(strType.equals("" + m_altExonRatioChangeA.GetType()) && m_spliceScore != null)
+		{
+			return m_spliceScore.GetTypeAsString();
+		}
+		
+		return strType;
+/*
 		String strType = "?";
 		switch(m_nType)
 		{
@@ -603,8 +660,8 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 			case SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END:			strType = "alt_5_prime_exon_end";			break;
 			default:													strType = "" + m_nType; 					break;
 		}
-		
 		return strType;
+*/
 	}
 	
 	public String GetResultTypeAsString()
@@ -661,6 +718,51 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		return m_nID;
 	}
 
+	public double GetImportedDataPValue()
+	{
+		return m_fImportedDataPValue;
+	}
+	
+	public double GetImportedDataAdjustedPValue()
+	{
+		return m_fImportedDataPAdjusted;
+	}
+	
+	public double GetImportedDataFDR()
+	{
+		return m_fImportedDataFDR;
+	}
+	
+	public double GetImportedDataLog2FC()
+	{
+		return m_fImportedDataLog2FC;
+	}
+	
+	public int GetResultSource()
+	{
+		return m_nResultSource;
+	}
+	
+	public void SetImportedDataAdjustedPValue(double fVal)
+	{
+		m_fImportedDataPAdjusted = fVal;
+	}
+	
+	public void SetImportedDataFDR(double fVal)
+	{
+		m_fImportedDataFDR = fVal;
+	}
+	
+	public void SetImportedDataLog2FC(double fVal)
+	{
+		m_fImportedDataLog2FC = fVal;
+	}
+	
+	public void SetResultSource(int nResultSource)
+	{
+		m_nResultSource = nResultSource;
+	}
+	
 	@Override
 	public int compareTo(AnalysisResult other)
 	{
@@ -668,7 +770,7 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		if(nComp != 0) return nComp;
 		
 		nComp = m_strGeneID.compareTo(other.m_strGeneID);
-		if(nComp != 0) return nComp;		
+		if(nComp != 0) return nComp;
 		
 		if(m_vcSelectedIsoforms.size() < other.m_vcSelectedIsoforms.size())
 			return -1;
@@ -715,7 +817,7 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 			nComp = m_spliceScore.compareTo(other.m_spliceScore);
 			if(nComp != 0) return nComp;
 		}
-
+		
 		return 0;
 	}
 
@@ -819,5 +921,606 @@ public class AnalysisResult implements Comparable<AnalysisResult>
 		{
 			m_spliceScore = null;
 		}
+	}
+
+	public void ParseManananggalOutput(String strLine)
+	{
+		String pSplit[] = strLine.split("\t");
+		
+		String strLocation[] = null;
+		if(!pSplit[5].equals("-"))
+		{
+			strLocation = pSplit[5].split(":");
+			m_strRef	= strLocation[0];
+		}
+		
+		m_nID 			= Integer.parseInt(pSplit[0].split("_")[1]);
+		m_strGeneID		= pSplit[1];
+		m_strGeneSymbol	= pSplit[2];
+
+		// use default settings
+		m_nRating 					= 0;
+		m_nMinJunctionReads 		= 3;
+		m_nMinCovPerBase 			= 5;
+		m_fMinCoveredBases			= 0.7;
+		m_fVariableExonThreshold	= 0.05;
+		m_strFileGTF				= "";
+		m_strComment				= "";
+		m_vcSelectedIsoforms 		= new TreeSet<String>();
+		m_altExonRatioChangeB 		= null;
+		m_nResultSource		     	= SplicingWebApp.IMPORTED_DATA_TYPE_MANA;
+		
+		if(pSplit[3].equals("combined"))
+			m_nType = RESULT_EVIDENCE_TYPE_COMBINED;
+		else if(pSplit[3].equals("split_read_only"))
+			m_nType = RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY;
+		else if(pSplit[3].equals("ratio_only"))
+			m_nType = RESULT_EVIDENCE_TYPE_RATIO_ONLY;
+		
+		if(m_nType == RESULT_EVIDENCE_TYPE_RATIO_ONLY || m_nType == RESULT_EVIDENCE_TYPE_COMBINED)
+		{
+			m_altExonRatioChangeA = new AlternativeSplicingExon();
+			
+			if(strLocation != null)
+			{
+				m_altExonRatioChangeA.m_nStart = Integer.parseInt(strLocation[1].split("-")[0]);
+				m_altExonRatioChangeA.m_nEnd   = Integer.parseInt(strLocation[1].split("-")[1]);
+			}
+			m_altExonRatioChangeA.m_fFractionChangeAbsolute = Double.parseDouble(pSplit[11]);
+			m_altExonRatioChangeA.m_fFractionChangeRelative = Double.parseDouble(pSplit[12]);
+			m_altExonRatioChangeA.m_fPValue = Double.parseDouble(pSplit[13]);
+			
+			if(pSplit[4].equals("exn_skipping"))		 			m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_EXON_SKIPPING;
+			else if(pSplit[4].equals("alt_start_unique_jun")) 		m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN;
+			else if(pSplit[4].equals("alt_end_unique_jun"))	 		m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN;
+			else if(pSplit[4].equals("alt_start_shared_jun")) 		m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN;
+			else if(pSplit[4].equals("alt_end_shared_jun")) 	 	m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN;
+			else if(pSplit[4].equals("retained_intron")) 		 	m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_RETAINED_INTRON;
+			else if(pSplit[4].equals("alt_start_unique_jun_double")) m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE;
+			else if(pSplit[4].equals("alt_end_unique_jun_double")) 	m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE;
+			else if(pSplit[4].equals("alt_start_shared_jun_double")) m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN_DOUBLE;
+			else if(pSplit[4].equals("alt_end_shared_jun_double")) 	m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN_DOUBLE;
+			
+			m_altExonRatioChangeA.m_fAltExonCovPerBaseA = Double.parseDouble(pSplit[8]);
+			m_altExonRatioChangeA.m_fAltExonCovPerBaseB = Double.parseDouble(pSplit[9]);
+			
+			m_altExonRatioChangeA.m_pFractionOtherExons = null;
+			m_altExonRatioChangeA.m_pFractionTestedExon = null;
+			m_altExonRatioChangeA.m_strConditionA = pSplit[6];
+			m_altExonRatioChangeA.m_strConditionB = pSplit[7];
+		}
+		else
+		{
+			m_altExonRatioChangeA = null;
+		}
+		
+		if(m_nType == RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY || m_nType == RESULT_EVIDENCE_TYPE_COMBINED)
+		{
+			m_spliceScore = new SimpleSpliceScore();
+			
+			m_spliceScore.m_JunctionInclusion = new CountElement();
+			m_spliceScore.m_JunctionInclusion.m_nStart = Integer.parseInt(pSplit[14]);
+			m_spliceScore.m_JunctionInclusion.m_nEnd   = Integer.parseInt(pSplit[15]);
+			
+			m_spliceScore.m_JunctionExclusion = new CountElement();
+			m_spliceScore.m_JunctionExclusion.m_nStart = Integer.parseInt(pSplit[16]);
+			m_spliceScore.m_JunctionExclusion.m_nEnd   = Integer.parseInt(pSplit[17]);
+
+			m_spliceScore.m_fInclusionChange = Double.parseDouble(pSplit[18]);
+			m_spliceScore.m_fPValue          = Double.parseDouble(pSplit[19]);
+			
+			if(pSplit[20].equals("TRUE")) m_spliceScore.m_bSignificant = true;
+			if(pSplit[21].equals("TRUE")) m_spliceScore.m_bIsNovel = true;
+		}
+		else
+		{
+			m_spliceScore = null;
+		}
+		
+		if(m_nType == -1)
+		{
+			System.out.println(Arrays.toString(pSplit));
+		}
+	}
+	
+	public void ParseDEXSeqOutput(String strLine, int nID, String[] pColumnNames)
+	{		
+		String pSplit[] = strLine.split("\t");
+
+		m_nID 			= nID;
+		
+		// use default settings
+		m_nRating 					= 0;
+		m_nMinJunctionReads 		= 3;
+		m_nMinCovPerBase 			= 5;
+		m_fMinCoveredBases			= 0.7;
+		m_fVariableExonThreshold	= 0.05;
+		m_strFileGTF				= "";
+		m_strComment				= "";
+		m_vcSelectedIsoforms 		= new TreeSet<String>();
+		m_altExonRatioChangeB 		= null;
+		
+		m_altExonRatioChangeA		  = new AlternativeSplicingExon();
+		m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_EXON_SKIPPING;
+		m_nType						  = RESULT_EVIDENCE_TYPE_COMBINED;
+		m_nResultSource				  = SplicingWebApp.IMPORTED_DATA_TYPE_DEXSEQ;
+		
+		for(int i=0; i<pColumnNames.length; i++)
+		{
+			String strCol = pColumnNames[i];
+			
+			switch(strCol)
+			{
+				case "groupID":
+					m_strGeneID	= pSplit[i].split("\\+")[0];
+					break;
+					
+				case "gene_id":
+					m_strGeneID	= pSplit[i];
+					break;
+				
+				case "gene_symbol":
+					m_strGeneSymbol	= pSplit[i];
+					break;
+					
+				case "genomicData.start":
+					m_altExonRatioChangeA.m_nStart = Integer.parseInt(pSplit[i]);
+					break;
+					
+				case "genomicData.end":
+					m_altExonRatioChangeA.m_nEnd = Integer.parseInt(pSplit[i]);
+					break;
+					
+				case "genomicData.seqnames":
+					m_strRef = pSplit[i];
+					break;
+					
+				case "pvalue":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataPValue = Double.NaN;
+					else
+						m_fImportedDataPValue = Double.parseDouble(strVal);
+					break;
+				}
+				
+				case "padj":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataPAdjusted = Double.NaN;
+					else
+						m_fImportedDataPAdjusted = Double.parseDouble(strVal);
+
+					// the two columns after this one contain the condition names
+					m_altExonRatioChangeA.m_strConditionA = pColumnNames[i+1];
+					m_altExonRatioChangeA.m_strConditionB = pColumnNames[i+2];
+					break;
+				}
+				
+				case "log2fold":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataLog2FC = Double.NaN;
+					else
+						m_fImportedDataLog2FC = Double.parseDouble(strVal);
+					break;
+				}
+			}
+		}
+	}
+	
+	public void ParseMatsOutput(String strLine, String[] pColumnNames)
+	{
+		String pSplit[] = strLine.split("\t");
+		
+		// use default settings
+		m_nRating 					= 0;
+		m_nMinJunctionReads 		= 3;
+		m_nMinCovPerBase 			= 5;
+		m_fMinCoveredBases			= 0.7;
+		m_fVariableExonThreshold	= 0.05;
+		m_strFileGTF				= "";
+		m_strComment				= "";
+		m_vcSelectedIsoforms 		= new TreeSet<String>();
+		m_altExonRatioChangeB 		= null;
+		
+		m_altExonRatioChangeA		  = new AlternativeSplicingExon();
+		m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_EXON_SKIPPING;
+		m_nType						  = RESULT_EVIDENCE_TYPE_COMBINED;
+		m_nResultSource				  = SplicingWebApp.IMPORTED_DATA_TYPE_RMATS;
+		
+		for(int i=0; i<pColumnNames.length; i++)
+		{
+			String strCol = pColumnNames[i];
+			
+			switch(strCol)
+			{
+				case "ID":
+					m_nID = Integer.parseInt(pSplit[i]);
+					break;
+
+				case "GeneID":
+					m_strGeneID	= pSplit[i].split("\\+")[0];
+					break;
+				
+				case "geneSymbol":
+					m_strGeneSymbol	= pSplit[i];
+					break;
+					
+				case "chr":
+					m_strRef = pSplit[i];
+					break;
+
+				case "exonStart_0base":
+					// also make it 1-based
+					m_altExonRatioChangeA.m_nStart = Integer.parseInt(pSplit[i]) + 1;
+					break;
+
+				case "exonEnd":
+					m_altExonRatioChangeA.m_nEnd = Integer.parseInt(pSplit[i]);
+					break;
+
+				case "PValue":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataPValue = Double.NaN;
+					else
+						m_fImportedDataPValue = Double.parseDouble(strVal);
+					break;
+				}
+				
+				case "FDR":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataFDR = Double.NaN;
+					else
+						m_fImportedDataFDR = Double.parseDouble(strVal);
+					break;
+				}
+				
+				case "IncLevelDifference":
+					m_altExonRatioChangeA.m_fFractionChangeAbsolute = Double.parseDouble(pSplit[i]);
+					break;
+			}
+		}
+	}
+	
+	public void ParseJSpliceOutput(String strLine, int nID, String[] pColumnNames)
+	{
+		String pSplit[] = strLine.split("\t");
+		
+		m_nID = nID;
+		
+		// use default settings
+		m_nRating 					= 0;
+		m_nMinJunctionReads 		= 3;
+		m_nMinCovPerBase 			= 5;
+		m_fMinCoveredBases			= 0.7;
+		m_fVariableExonThreshold	= 0.05;
+		m_strFileGTF				= "";
+		m_strComment				= "";
+		m_vcSelectedIsoforms 		= new TreeSet<String>();
+		m_altExonRatioChangeB 		= null;
+		
+		m_altExonRatioChangeA		  = new AlternativeSplicingExon();
+		m_nType						  = RESULT_EVIDENCE_TYPE_COMBINED;
+		m_nResultSource				  = SplicingWebApp.IMPORTED_DATA_TYPE_JSPLICE;
+		
+		m_spliceScore				= null;
+		boolean bIsMultiType		= false; // multiple alt. 3/5 prime, multiple excluded exons
+		
+		for(int i=0; i<pColumnNames.length; i++)
+		{
+			String strCol = pColumnNames[i];
+			
+			switch(strCol)
+			{
+				case "Gene_name|ID":
+				{
+					// check if the result can't be processed because it has no gene identifier
+					if(pSplit[i].isEmpty())
+					{
+						m_nID = -1;
+						return;
+					}
+					
+					String pSplit2[] = pSplit[i].split("\\|");
+					m_strGeneSymbol	 = pSplit2[0].split(",")[0];
+					m_strGeneID		 = pSplit2[1].split(",")[0];					
+					break;
+				}
+
+				case "ASM_type":
+				{
+					switch(pSplit[i])
+					{
+						case "Cassette exon":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_EXON_SKIPPING;
+							break;
+							
+						case "Mult. excl. exons": // in case they ever fix that typo
+						case "Mut. excl. exons":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_EXON_SKIPPING;
+							bIsMultiType = true;
+							break;
+							
+						case "Alt 5' site":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END;
+							break;
+							
+						case "Alt 3' site":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END;
+							break;
+							
+						case "Mult. alt. 5' site":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END;
+							bIsMultiType = true;
+							break;
+							
+						case "Mult. alt. 3' site":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END;
+							bIsMultiType = true;
+							break;
+							
+						case "Retained intron":
+							m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_RETAINED_INTRON;
+							break;
+						
+						default:
+							m_altExonRatioChangeA.m_nType = -1;
+							break;
+					}
+					break;
+				}
+
+				case "ASM_junctions":
+				{
+					// don't process multi-types
+					if(bIsMultiType)
+						break;
+					
+					m_spliceScore = new SimpleSpliceScore();
+					
+					String strJunctions = pSplit[i].replace(":-", "");
+					strJunctions = strJunctions.replace(":+", "");
+					strJunctions = strJunctions.replace(":unknown", "");
+					
+					String pJunctions[] = strJunctions.split(",");
+					
+					// store minimum and maximum position of the junctions,
+					// because that should be the exclusion junction
+					int nMinStart = Integer.MAX_VALUE;
+					int nMaxEnd   = 0;
+					
+					// collect all junctions
+					Vector<CountElement> vcJunctions = new Vector<CountElement>();
+					for(String strJunction : pJunctions)
+					{						
+						CountElement jun = new CountElement();
+						
+						if(m_strRef.isEmpty())
+							m_strRef = strJunction.split(":")[0]; 
+						jun.m_nStart = Integer.parseInt(strJunction.split(":")[1].split("-")[0]);
+						jun.m_nEnd   = Integer.parseInt(strJunction.split(":")[1].split("-")[1]);
+						vcJunctions.add(jun);
+						
+						nMinStart = Math.min(nMinStart, jun.m_nStart);
+						nMaxEnd   = Math.max(nMaxEnd, jun.m_nEnd);
+					}
+					
+					if(m_altExonRatioChangeA.m_nType == SplicingWebApp.AS_TYPE_EXON_SKIPPING)
+					{
+						// prepare the exclusion junction
+						m_spliceScore.m_JunctionExclusion = new CountElement();
+						m_spliceScore.m_JunctionExclusion.m_nStart = nMinStart;
+						m_spliceScore.m_JunctionExclusion.m_nEnd   = nMaxEnd;
+						m_spliceScore.m_nType = m_altExonRatioChangeA.m_nType;
+						
+						// pick one junction for the inclusion
+						for(CountElement jun : vcJunctions)
+						{
+							if(jun.equals(m_spliceScore.m_JunctionExclusion))
+								continue;
+							
+							m_spliceScore.m_JunctionInclusion = jun;
+							break;
+						}						
+					}
+					else if(m_altExonRatioChangeA.m_nType == SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END || m_altExonRatioChangeA.m_nType == SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END)
+					{
+						m_spliceScore.m_JunctionInclusion = vcJunctions.get(0);
+						m_spliceScore.m_JunctionExclusion = vcJunctions.get(1);
+						m_spliceScore.m_nType = m_altExonRatioChangeA.m_nType;
+					}
+					else
+					{
+						m_spliceScore = null;
+					}
+
+					break;
+				}
+
+				case "ASM_exons":
+				{
+					String strExons = pSplit[i].replace(":-", "");
+					strExons = strExons.replace(":+", "");
+					strExons = strExons.replace(":unknown", "");
+					
+					String pExons[] = strExons.split(",");
+					
+					// store minimum and maximum position of the exons
+					int nMinStart = Integer.MAX_VALUE;
+					int nMaxEnd   = 0;
+					
+					for(String strExon : pExons)
+					{
+						if(m_strRef.isEmpty())
+							m_strRef = strExon.split(":")[0];
+
+						int nStart = Integer.parseInt(strExon.split(":")[1].split("-")[0]);
+						int nEnd   = Integer.parseInt(strExon.split(":")[1].split("-")[1]);
+
+						nMinStart = Math.min(nMinStart, nStart);
+						nMaxEnd   = Math.max(nMaxEnd, nEnd);
+					}
+					
+					m_altExonRatioChangeA.m_nStart = nMinStart;
+					m_altExonRatioChangeA.m_nEnd   = nMaxEnd;
+					break;
+				}
+
+				case "adjPvalues":
+				{
+					String strVal = pSplit[i].split(":")[1];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataPValue = Double.NaN;
+					else
+						m_fImportedDataPValue = Double.parseDouble(strVal);
+					break;
+				}
+				
+				case "Largest_relFCs":
+				{
+					String strVal = pSplit[i].split(":")[1];
+					m_fImportedDataLog2FC = Double.parseDouble(strVal);
+					break;
+				}
+			}
+		}
+	}
+
+	public void ParseCuffdiffOutput(String strLine, String[] pColumnNames)
+	{
+		String pSplit[] = strLine.split("\t");
+		
+		// use default settings
+		m_nRating 					= 0;
+		m_nMinJunctionReads 		= 3;
+		m_nMinCovPerBase 			= 5;
+		m_fMinCoveredBases			= 0.7;
+		m_fVariableExonThreshold	= 0.05;
+		m_strFileGTF				= "";
+		m_strComment				= "";
+		m_vcSelectedIsoforms 		= new TreeSet<String>();
+		m_altExonRatioChangeB 		= null;
+		m_strGeneID					= "";
+		
+		m_altExonRatioChangeA		  = new AlternativeSplicingExon();
+		m_nType						  = RESULT_EVIDENCE_TYPE_COMBINED;
+		m_nResultSource				  = SplicingWebApp.IMPORTED_DATA_TYPE_JSPLICE;
+		m_altExonRatioChangeA.m_nType = SplicingWebApp.AS_TYPE_EXON_SKIPPING;
+		m_altExonRatioChangeA.m_nStart = 0;
+		m_altExonRatioChangeA.m_nEnd   = 0;
+		
+		for(int i=0; i<pColumnNames.length; i++)
+		{
+			String strCol = pColumnNames[i];
+			
+			switch(strCol)
+			{
+				case "test_id":
+				{
+					m_nID = Integer.parseInt(pSplit[i].replace("TSS", ""));
+					break;
+				}
+				case "gene":
+				{
+					// can't use results without identifier
+					if(pSplit[i].equals("-"))
+					{
+						m_nID = -1;
+						return;
+					}
+					m_strGeneSymbol	 = pSplit[i];
+					break;
+				}
+
+				case "locus":
+				{
+					/* not of interest, because it's just the gene locus
+					String pLocus[] = pSplit[i].split(":");
+					m_strRef = pLocus[0];					
+					m_altExonRatioChangeA.m_nStart = Integer.parseInt(pLocus[1].split("-")[0]);
+					m_altExonRatioChangeA.m_nEnd   = Integer.parseInt(pLocus[1].split("-")[1]);
+					*/
+					break;
+				}
+
+				case "p_value":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataPValue = Double.NaN;
+					else
+						m_fImportedDataPValue = Double.parseDouble(strVal);
+					break;
+				}
+				
+				case "q_value":
+				{
+					String strVal = pSplit[i];
+					
+					if(strVal.equals("NA"))
+						m_fImportedDataPAdjusted = Double.NaN;
+					else
+						m_fImportedDataPAdjusted = Double.parseDouble(strVal);
+					break;
+				}
+				
+				case "sqrt(JS)":
+				{
+					m_fImportedDataLog2FC = Double.parseDouble(pSplit[i]);
+					break;
+				}
+				
+				case "significant":
+				{
+					if(pSplit[i].equals("no"))
+					{
+						m_nID = -1;
+						return;
+					}
+					break;
+				}
+			}
+		}
+	}
+	
+	/**
+	 * This comparator is used to sort imported results by p-value (instead of other things)
+	 */
+	public static Comparator<AnalysisResult> ImportedPValueComparator = new Comparator<AnalysisResult>()
+	{
+		@Override
+		public int compare(AnalysisResult first, AnalysisResult second)
+		{
+			// lastly, use data from imported results
+			if(first.GetImportedDataPValue() == second.GetImportedDataPValue())
+				return 0;
+			else if(first.GetImportedDataPValue() < second.GetImportedDataPValue())
+				return -1;
+			else
+				return 1;
+		}
+	};
+
+	/**
+	 *   Sets the gene ID
+	 */
+	public void SetGeneID(String strGeneID)
+	{
+		this.m_strGeneID = strGeneID;
 	}
 }

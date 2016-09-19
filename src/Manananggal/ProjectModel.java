@@ -33,6 +33,7 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.Scanner;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -57,12 +58,13 @@ public class ProjectModel implements Comparable<ProjectModel>
 	private String m_strProjectName;
 	private String m_strJunctionCountPath;
 	private String m_strCreationDate;
-	private TreeMap<String, TreeSet<String>> m_mapConditonsToConditionTypes;
+	private TreeMap<String, TreeSet<String>> m_mapConditionsToConditionTypes;
 	private TreeMap<String, TreeSet<String>> m_mapSamplesToIndividuals;
 	private TreeSet<Sample>	m_vcSamples;	
 	private boolean bIsReady;
 	private boolean m_bDataIsPaired;
 	private TreeMap<String, RandomJunctionReader> m_mapJunctionReader; // one junction reader per condition	
+	private String m_strFirstConditionType;	// stores the first condition type (by column index instead of alphanumeric sorting)
 	
 	private class Sample implements Comparable<Sample>
 	{
@@ -77,10 +79,10 @@ public class ProjectModel implements Comparable<ProjectModel>
 		
 		Sample()
 		{
-			m_strName			= "?";
-			m_strBigWigFile  	= "?";
-			m_strJunctionFile 	= "?";
-			m_strIndividual		= "?";
+			m_strName			= "";
+			m_strBigWigFile  	= "";
+			m_strJunctionFile 	= "";
+			m_strIndividual		= "";
 			m_fSizeFactor		= 0.0;
 			m_mapConditionTypeToConditions = new TreeMap<String, String>();
 		}
@@ -94,29 +96,33 @@ public class ProjectModel implements Comparable<ProjectModel>
 	
 	ProjectModel()
 	{
-		m_strProjectFilePath			= "?";
-		m_strProjectName				= "?";
-		m_strJunctionCountPath			= "?";
-		m_strCreationDate				= "?";
-		m_mapConditonsToConditionTypes	= new TreeMap<String, TreeSet<String>>();
+		m_strProjectFilePath			= "";
+		m_strProjectName				= "";
+		m_strJunctionCountPath			= "";
+		m_strCreationDate				= "";
+		m_mapConditionsToConditionTypes	= new TreeMap<String, TreeSet<String>>();
 		m_mapSamplesToIndividuals		= new TreeMap<String, TreeSet<String>>();
 		m_vcSamples 					= new TreeSet<Sample>();
 		bIsReady 						= false;
 		m_mapJunctionReader				= new TreeMap<String, RandomJunctionReader>();
 		m_bDataIsPaired					= false;
+		m_strFirstConditionType			= "";
 	}
 
 	public void clear()
 	{
-		m_strProjectFilePath			= "?";
-		m_strProjectName				= "?";
-		m_strJunctionCountPath			= "?";
-		m_strCreationDate				= "?";
+		m_strProjectFilePath			= "";
+		m_strProjectName				= "";
+		m_strJunctionCountPath			= "";
+		m_strCreationDate				= "";
 		bIsReady 						= false;
+		m_bDataIsPaired					= false;
 		m_mapJunctionReader				= new TreeMap<String, RandomJunctionReader>();
+		m_strFirstConditionType			= "";
 		
-		m_mapConditonsToConditionTypes.clear();
+		m_mapConditionsToConditionTypes.clear();
 		m_vcSamples.clear();
+		m_mapSamplesToIndividuals.clear();
 	}
 	
 	/**
@@ -128,10 +134,10 @@ public class ProjectModel implements Comparable<ProjectModel>
 	 *    If this file cannot be found, the program will attempt
 	 *    to generate it from the plain text count files.
 	 */
-	public boolean Init(String strProjectFile, int nMergingJunctions_minSamples, int nMergingJunctions_minSampleCoverage, double fMergingJunctions_MinAverageCount, int nMergingJunctions_minCoverageSingleSample, boolean bLoadJunctionCounts) throws IOException
-	{	
-		m_mapConditonsToConditionTypes.clear();
-		m_vcSamples.clear();
+	public boolean Init(String strProjectFile, int nMergingJunctions_minSamples, int nMergingJunctions_minSampleCoverage, double fMergingJunctions_MinAverageCount, int nMergingJunctions_minCoverageSingleSample, boolean bLoadJunctionCounts, boolean bIgnoreInvalidSizeFactors) throws IOException
+	{
+		// clear old data
+		clear();
 		
 		// get project name
 		File pProject 			= new File(strProjectFile);
@@ -170,7 +176,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		String strHeader = pScanner.nextLine();
 		
 		// map columns
-		TreeMap<String, Integer> mapColumns = new TreeMap<String, Integer>();
+		HashMap<String, Integer> mapColumns = new HashMap<String, Integer>();
 		String[] pSplit = strHeader.split("\\s+");
 		for(int i=0; i<pSplit.length; i++)
 		{
@@ -181,15 +187,13 @@ public class ProjectModel implements Comparable<ProjectModel>
 		// header must contain certain key-words
 		if(!mapColumns.containsKey("sample") || !mapColumns.containsKey("bigwig_files") || !mapColumns.containsKey("junction_count_files"))
 		{
-			System.out.println("missing required column. Project file must contain the following columns:");
-			System.out.println("sample");
-			System.out.println("bigwig_files");
-			System.out.println("junction_count_files");
+			System.out.println("missing required column. Project file must contain the following columns: <sample> <bigwig_files> <junction_count_files>");
 			pScanner.close();
 			return false;
 		}
 		
 		// now add the samples
+		boolean bIdentifyFirstConditionType = true;
 		while(pScanner.hasNextLine())
 		{			
 			String strLine = pScanner.nextLine();
@@ -200,7 +204,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 				System.out.println("invalid line in project file: " + strLine);
 				continue;
 			}
-			
+						
 			Sample sample = new Sample();
 
 			for(String strColumn : mapColumns.keySet())
@@ -241,6 +245,10 @@ public class ProjectModel implements Comparable<ProjectModel>
 					}
 					case "size_factors":
 					{
+						// skip if we don't need to validate the size factors (e.g. if they are going to be recalculated)
+						if(bIgnoreInvalidSizeFactors)
+							break;
+							
 						String strNumber = pSplit[mapColumns.get(strColumn)].trim();
 						try
 						{
@@ -268,17 +276,24 @@ public class ProjectModel implements Comparable<ProjectModel>
 					}
 					default:
 					{
+						// add conditions to column ordered condition type vector
+						if(bIdentifyFirstConditionType)
+						{
+							m_strFirstConditionType = strColumn;
+							bIdentifyFirstConditionType = false;
+						}
+						
 						sample.m_mapConditionTypeToConditions.put(strColumn, pSplit[mapColumns.get(strColumn)]);
 
-						if(m_mapConditonsToConditionTypes.containsKey(strColumn))
+						if(m_mapConditionsToConditionTypes.containsKey(strColumn))
 						{
-							m_mapConditonsToConditionTypes.get(strColumn).add(pSplit[mapColumns.get(strColumn)].trim());
+							m_mapConditionsToConditionTypes.get(strColumn).add(pSplit[mapColumns.get(strColumn)].trim());
 						}
 						else
 						{
 							TreeSet<String> vcTmp = new TreeSet<String>();
 							vcTmp.add(pSplit[mapColumns.get(strColumn)].trim());
-							m_mapConditonsToConditionTypes.put(strColumn, vcTmp);
+							m_mapConditionsToConditionTypes.put(strColumn, vcTmp);
 						}
 						break;
 					}
@@ -286,12 +301,12 @@ public class ProjectModel implements Comparable<ProjectModel>
 			}
 			
 			// get path to junction counts
-			if(m_strJunctionCountPath.equals("?"))
+			if(m_strJunctionCountPath.isEmpty())
 			{
 				File pFile = new File(sample.m_strJunctionFile);
 				String strFullPath = pFile.getAbsolutePath();
 				m_strJunctionCountPath = strFullPath.substring(0, strFullPath.lastIndexOf(File.separatorChar));
-			}
+			}			
 
 			// check if file exists on data load
 			if(bLoadJunctionCounts)
@@ -299,7 +314,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 				boolean bMergedFileExists = true;
 				// it's sufficient if the merged files exist
 				// use first condition type by default				
-				String strConditionType = m_mapConditonsToConditionTypes.firstKey();
+				String strConditionType = m_strFirstConditionType;
 				
 				// get condition for current sample
 				TreeMap<String, TreeSet<String>> mapSamplesToCondition = GetSamplesPerCondition(strConditionType);
@@ -350,9 +365,9 @@ public class ProjectModel implements Comparable<ProjectModel>
 		if(bLoadJunctionCounts)
 		{
 			// use first condition type by default
-			String strConditionType = m_mapConditonsToConditionTypes.firstKey();
+			String strConditionType = m_strFirstConditionType;
 			
-			for(String strCondition : this.m_mapConditonsToConditionTypes.get(strConditionType))
+			for(String strCondition : this.m_mapConditionsToConditionTypes.get(strConditionType))
 			{
 				// check if the merged and indexed junction count table exists				
 				String strMergedJunctionCountFile = m_strJunctionCountPath + "/" + strCondition + ".merged_junction_counts.dat";
@@ -542,7 +557,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 		}
 		
 		int nItemsWritten = 0;
-		String strCurrentReference = "?";
+		String strCurrentReference = "";
 		
 		int nFirstItemStart = -1;
 		int nLastItemEnd	= 0;
@@ -716,7 +731,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 
 	public TreeMap<String, TreeSet<String>> GetConditionsToConditionTypes()
 	{
-		return m_mapConditonsToConditionTypes;
+		return m_mapConditionsToConditionTypes;
 	}
 	
 	public TreeMap<String, TreeSet<String>> GetSamplesPerIndividual()
@@ -726,10 +741,10 @@ public class ProjectModel implements Comparable<ProjectModel>
 	
 	public TreeSet<String> GetConditions(String strConditionType)
 	{
-		if(!m_mapConditonsToConditionTypes.containsKey(strConditionType))
+		if(!m_mapConditionsToConditionTypes.containsKey(strConditionType))
 			return null;
 		
-		return m_mapConditonsToConditionTypes.get(strConditionType);
+		return m_mapConditionsToConditionTypes.get(strConditionType);
 	}
 	
 	public TreeMap<String, Double> GetSizeFactors()
@@ -848,7 +863,7 @@ public class ProjectModel implements Comparable<ProjectModel>
 	/** Retrieves all junction counts in the specified region from the binary count file */
 	public TreeMap<CountElement, TreeMap<String, Integer>> GetJunctionsForRangeAsCountElements(String strRef, int nStart, int nEnd) throws IOException
 	{
-		TreeSet<String> vcConditions = m_mapConditonsToConditionTypes.get(m_mapConditonsToConditionTypes.firstKey());
+		TreeSet<String> vcConditions = m_mapConditionsToConditionTypes.get(m_strFirstConditionType);
 		
 		TreeMap<CountElement, TreeMap<String, Integer>> mapRes = new TreeMap<CountElement, TreeMap<String, Integer>>();
 		
@@ -886,13 +901,13 @@ public class ProjectModel implements Comparable<ProjectModel>
 		// check whether the input files exist
 		if(!pFileIdx.exists())
 		{
-			System.out.println("Failed to open mmseq index file -> " + strMMseqFile +".idx");
+//			System.out.println("Failed to open mmseq index file -> " + strMMseqFile +".idx");
 			return null;
 		}
 		
 		if(!pFileData.exists())
 		{
-			System.out.println("Failed to open mmseq data file -> " + strMMseqFile);
+//			System.out.println("Failed to open mmseq data file -> " + strMMseqFile);
 			return null;
 		}
 		
@@ -918,7 +933,6 @@ public class ProjectModel implements Comparable<ProjectModel>
 			
 			if(pSplit[0].equals(strGene))
 			{
-				System.out.println(strLine);
 				nFileOffset = Long.parseLong(pSplit[1]);
 				break;
 			}
@@ -1085,5 +1099,13 @@ public class ProjectModel implements Comparable<ProjectModel>
 	boolean ProjectHasPairedData()
 	{
 		return m_bDataIsPaired;
+	}
+
+	/**
+	 *   Returns the first condition type
+	 */
+	public String GetFirstConditionType()
+	{
+		return m_strFirstConditionType;
 	}
 }

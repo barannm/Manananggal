@@ -168,6 +168,9 @@ public class AlternativeSplicingExon implements Comparable<AlternativeSplicingEx
 		m_nType = nType;
 	}
 
+	/**
+	 * Writes Manananggal results to a binary file
+	 */
 	public void WriteToFile(FileOutputStream pOut) throws IOException
 	{
 		SplicingWebApp.WriteStringToFileOutputStream(m_strID, pOut);
@@ -199,6 +202,9 @@ public class AlternativeSplicingExon implements Comparable<AlternativeSplicingEx
 		pOut.write(bb.array());
 	}
 	
+	/**
+	 * Reads Manananggal results from binary files
+	 */
 	public void ReadFromFile(FileInputStream pIn) throws IOException
 	{
 		m_strID 		= SplicingWebApp.ReadStringFromFileInputStream(pIn);

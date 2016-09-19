@@ -70,6 +70,7 @@ import org.zkoss.zk.ui.event.Event;
 import org.zkoss.zk.ui.event.EventListener;
 import org.zkoss.zk.ui.event.Events;
 import org.zkoss.zk.ui.event.MouseEvent;
+import org.zkoss.zk.ui.ext.AfterCompose;
 import org.zkoss.zk.ui.util.Clients;
 import org.zkoss.zul.Area;
 import org.zkoss.zul.Bandbox;
@@ -81,9 +82,9 @@ import org.zkoss.zul.Comboitem;
 import org.zkoss.zul.Groupbox;
 import org.zkoss.zul.Hbox;
 import org.zkoss.zul.Hlayout;
+import org.zkoss.zul.Html;
 import org.zkoss.zul.Image;
 import org.zkoss.zul.Imagemap;
-import org.zkoss.zul.Borderlayout;
 import org.zkoss.zul.Label;
 import org.zkoss.zul.Listbox;
 import org.zkoss.zul.Listcell;
@@ -91,12 +92,10 @@ import org.zkoss.zul.Listhead;
 import org.zkoss.zul.Listheader;
 import org.zkoss.zul.Listitem;
 import org.zkoss.zul.Messagebox;
-import org.zkoss.zul.North;
-import org.zkoss.zul.Center;
+import org.zkoss.zul.Paging;
 import org.zkoss.zul.Radio;
 import org.zkoss.zul.Radiogroup;
 import org.zkoss.zul.Separator;
-import org.zkoss.zul.South;
 import org.zkoss.zul.Tabbox;
 import org.zkoss.zul.Tabpanels;
 import org.zkoss.zul.Tabs;
@@ -110,6 +109,7 @@ import org.zkoss.zul.Treeitem;
 import org.zkoss.zul.Treerow;
 import org.zkoss.zul.Vlayout;
 import org.zkoss.zul.Window;
+import org.zkoss.zul.event.PagingEvent;
 
 import BioKit.Exon;
 import BioKit.ExonGroup;
@@ -124,9 +124,33 @@ import BioKit.Utils;
  *    Currently, it also provides some functions for data processing (e.g. the selection of valid isoforms) that might be moved to
  *    the DataSupplier in later versions of the program.
  */
-public class SplicingWebApp extends Window
+public class SplicingWebApp extends Window implements AfterCompose
 {
 	private static final long serialVersionUID = 1L;
+	
+	static final int		PROJECT_PAGING_SIZE		= 10;
+	
+	static final int		GTF_REFERENCE_FILE 		= 1;
+	static final int		REFFLAT_REFERENCE_FILE 	= 2;
+	
+	static final int		AS_TYPE_EXON_SKIPPING				= 1;
+	static final int		AS_TYPE_ALT_START_UNIQUE_JUN		= 2;	// alternative start exon with unique junction
+	static final int		AS_TYPE_ALT_END_UNIQUE_JUN			= 3;	// alternative end exon with unique junction
+	static final int		AS_TYPE_ALT_START_SHARED_JUN		= 4;	// alternative start exon that shares the junction with a 'middle' exon
+	static final int		AS_TYPE_ALT_END_SHARED_JUN			= 5;	// alternative start exon that shares the junction with a 'middle' exon
+	static final int		AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE	= 6;	// this type is only set if there are at least two start exons that have coverage ratio changes
+	static final int		AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE	= 7;	// this type is only set if there are at least two end exons that have coverage ratio changes
+	static final int		AS_TYPE_ALT_START_SHARED_JUN_DOUBLE	= 8;	// this type is only set if there are at least two start exons that have coverage ratio changes
+	static final int		AS_TYPE_ALT_END_SHARED_JUN_DOUBLE	= 9;	// this type is only set if there are at least two end exons that have coverage ratio changes
+	static final int		AS_TYPE_RETAINED_INTRON				= 10;
+	static final int		AS_TYPE_ALT_5_PRIME_EXON_END		= 11;
+	static final int		AS_TYPE_ALT_3_PRIME_EXON_END		= 12;
+	
+	static final int		IMPORTED_DATA_TYPE_MANA   			= 1;
+	static final int 		IMPORTED_DATA_TYPE_RMATS  			= 2;
+	static final int 		IMPORTED_DATA_TYPE_DEXSEQ 			= 3;
+	static final int 		IMPORTED_DATA_TYPE_JSPLICE 			= 4;
+	static final int 		IMPORTED_DATA_TYPE_CUFFDIFF			= 5;
 	
 	private int				m_nThreads;
 	private String			m_strPathReferences;
@@ -140,28 +164,7 @@ public class SplicingWebApp extends Window
 	private int				m_nReferenceType;
 	RandomAccessGFFReader 	m_gffReader;
 	
-	static final int		GTF_REFERENCE_FILE 		= 1;
-	static final int		REFFLAT_REFERENCE_FILE 	= 2;
-	
-	static final int		AS_TYPE_EXON_SKIPPING			= 1;
-	static final int		AS_TYPE_ALT_START_UNIQUE_JUN	= 2;		// alternative start exon with unique junction
-	static final int		AS_TYPE_ALT_END_UNIQUE_JUN		= 3;		// alternative end exon with unique junction
-	static final int		AS_TYPE_ALT_START_SHARED_JUN	= 4;		// alternative start exon that shares the junction with a 'middle' exon
-	static final int		AS_TYPE_ALT_END_SHARED_JUN		= 5;		// alternative start exon that shares the junction with a 'middle' exon
-	static final int		AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE	= 6;	// this type is only set if there are at least two start exons that have coverage ratio changes
-	static final int		AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE	= 7;	// this type is only set if there are at least two end exons that have coverage ratio changes
-	static final int		AS_TYPE_ALT_START_SHARED_JUN_DOUBLE	= 8;	// this type is only set if there are at least two start exons that have coverage ratio changes
-	static final int		AS_TYPE_ALT_END_SHARED_JUN_DOUBLE	= 9;	// this type is only set if there are at least two end exons that have coverage ratio changes
-	static final int		AS_TYPE_RETAINED_INTRON				= 10;
-	static final int		AS_TYPE_ALT_5_PRIME_EXON_END		= 11;
-	static final int		AS_TYPE_ALT_3_PRIME_EXON_END		= 12;
-	
 	private GeneIdentifierHandler 	m_geneIdentifierHandler;
-	
-	// this layout defines regions for buttons/options (north), the splice graph (west) and main plots (center)
-	private Borderlayout 			m_layout;
-	private North					m_layoutNorth;
-	private Center					m_layoutCenter;
 
 	private int						m_nMinCovPerBase;			// Used as threshold to exclude exons with low coverage
 	private double					m_fMinCoveredBases;			// Used as threshold to exclude exons that are only partially covered
@@ -174,16 +177,13 @@ public class SplicingWebApp extends Window
 	private Textbox					m_textboxVariableExonThreshold;
 	
 	private Textbox					m_textboxMinExonThreshold;	// threshold for the removal of small isoforms (viewer only)
-
-	// this layout is for the main plots and will be used for the isoform, coverage and new junction plots
-	private Borderlayout			m_layoutMainPlots;
-	private North					m_layoutMainTop;
-	private South					m_layoutMainSouth;
-	private Vlayout					m_layoutMainBottom;
 	
 	// handle to application and popup window
 	SplicingWebApp 					m_hWindow;
 	Window							m_windowPopup;
+	
+	private Vlayout					m_layoutCoveragePlot;
+	private Vlayout					m_layoutIsoformPlot;
 	
 	// plot factories
 	PlotFactory						m_plotFactory;
@@ -203,6 +203,9 @@ public class SplicingWebApp extends Window
 	
 	private Textbox				m_txtboxURL;
 	private Bandbox				m_bandboxProjects;
+	private Bandpopup 			m_bandpopupProjects;
+	private Listbox				m_listboxProjects;
+	private Paging				m_pagingProjects;
 	private String				m_strSelectedCondition;
 	private Combobox			m_comboboxSelectedCondition;
 	private Combobox			m_comboboxSelectedConditionType;
@@ -220,7 +223,6 @@ public class SplicingWebApp extends Window
 	private Checkbox 			m_checkboxUseLog2;
 	private Checkbox			m_checkboxShowQuartiles;
 	private Checkbox			m_checkboxColorExonsAndJunctionsByCoverage;
-	private Checkbox			m_checkboxShowSecondCoveragePlot;
 	private	Checkbox			m_checkboxHighlightUniqueExons;
 	private Checkbox			m_checkboxCoverageGrid;
 	private Checkbox			m_checkboxSwitchStrand;
@@ -653,15 +655,7 @@ public class SplicingWebApp extends Window
 		m_bMMSeqAvailable		 = false;
 		m_bGTEXAvailableForGenes = false;
 		m_bGTEXAvailableForExons = false;
-		
-		m_layoutNorth		= new North();
-		m_layoutCenter		= new Center();
-				
-		m_layoutMainTop	 	= new North();
-		m_layoutMainSouth	= new South();	
-		m_layoutMainPlots 	= new Borderlayout();	
-		m_layoutMainBottom 	= new Vlayout();
-		
+
 		m_vcASResults 		= new AnalysisResultHandler();
 		
 		m_bWindowSizeChanged = false;
@@ -684,13 +678,7 @@ public class SplicingWebApp extends Window
 		m_imgMapIsoforms	= new Imagemap();
 		m_imgMapCoverage	= new Imagemap();
 		m_imgMapColors		= null;
-		
-		m_layoutNorth		= new North();
-		m_layoutCenter		= new Center();
-				
-		m_layoutMainTop	 	= new North();
-		m_layoutMainSouth	= new South();		
-		
+			
 		m_bShowEntropyData		 = false;
 		
 		m_vcValidIsoforms					= new TreeSet<String>();
@@ -738,6 +726,18 @@ public class SplicingWebApp extends Window
 				m_plotFactory.SetClientSize(nClientWindowWidth, nClientWindowHeight);
 				
 				m_textboxWindowWidth.setText("" + nClientWindowWidth);
+				
+				// some dirty code to enforce a maximum width on the project bandbox
+				m_bandpopupProjects.setHflex("min");
+				String strWidth = "width: " + (m_plotFactory.GetClientSize()[0] * 0.75) + "px;";
+				String strMaxWidth = "max-" + strWidth;
+				m_bandpopupProjects.setStyle(strMaxWidth);
+				m_bandpopupProjects.setZclass(strMaxWidth);
+
+				Clients.resize(m_bandpopupProjects);
+
+				m_pagingProjects.setHflex("min");
+				Clients.resize(m_pagingProjects);
 			}
 		});
 		
@@ -986,56 +986,52 @@ public class SplicingWebApp extends Window
 		});
 		
 		//######################################
-		//           add gui elements (top)
+		//           add gui elements
 		//######################################
-		m_layout = new Borderlayout();
-		m_layout.setVflex("min");
-		m_layout.setHeight("100%");
-		m_layout.setWidth("100%");
-		m_layout.setParent(this);
-
-		m_layoutNorth.setHflex("min");
-		m_layoutNorth.setParent(m_layout);
-		m_layoutNorth.setMargins("0,5,5,5");
-	
-		//#################################################################################################
-		//     add main plot layouts (center=coverage track, bottom = isoforms)
-		//#################################################################################################
-		m_layoutCenter.setVflex("min");
-		m_layoutCenter.setParent(m_layout);
-
-		m_layoutMainPlots = new Borderlayout();
-		m_layoutMainPlots.setVflex("min");
-		m_layoutMainPlots.setParent(m_layoutCenter);		
-
-		m_layoutMainTop.setTitle("Coverage Track");
-		m_layoutMainTop.setHeight("280px");
-		m_layoutMainTop.setAutoscroll(true);
-		m_layoutMainTop.setId("CoveragePlot");
-		m_layoutMainTop.setAttribute("org.zkoss.zul.nativebar", "true");
-		m_layoutMainTop.setParent(m_layoutMainPlots);
-
-		m_layoutMainSouth.setTitle("Isoform View");
-		m_layoutMainSouth.setHeight("600px");
-		m_layoutMainSouth.setParent(m_layoutMainPlots);
-		
-		m_layoutMainBottom 	= new Vlayout();
-		m_layoutMainBottom.setId("IsoformPlot");
-		m_layoutMainBottom.setParent(m_layoutMainSouth);
-		m_layoutMainBottom.setAttribute("org.zkoss.zul.nativebar", "true");
-		m_layoutMainBottom.setStyle("overflow: auto;");
+		Vlayout mainLayout = new Vlayout();
+		mainLayout.setParent(this);
 
 		//#################################
 		//      add buttons/options
 		//#################################
 		Hlayout layoutH = new Hlayout();
-		layoutH.setParent(m_layoutNorth);
-		layoutH.setStyle("overflow:auto; margin-top: 10px; margin-right: 10px; margin-bottom: 10px;");
+		layoutH.setParent(mainLayout);
+		layoutH.setHeight("570px");
+		layoutH.setStyle("overflow:auto; margin-top: 5px; margin-right: 10px; margin-bottom: 0px;");
 		
-		Vlayout layoutV = new Vlayout();
-		layoutV.setHeight("200px");
+		Vlayout layoutV = new Vlayout();		
 		layoutV.setVflex("min");
 		layoutV.setParent(layoutH);
+		
+		//####################################
+		//    Add div and layout for coverage plot
+		//####################################
+		Groupbox grpBox = new Groupbox();
+		grpBox.setTitle("Coverage tracks");
+		grpBox.setParent(mainLayout);
+		grpBox.setMold("3d");
+		grpBox.setClosable(false);
+		m_layoutCoveragePlot = new Vlayout();
+		m_layoutCoveragePlot.setId("CoveragePlot");
+		m_layoutCoveragePlot.setParent(grpBox);
+		m_layoutCoveragePlot.setAttribute("org.zkoss.zul.nativebar", "true");
+		m_layoutCoveragePlot.setStyle("overflow: auto;");
+		m_layoutCoveragePlot.setHeight("240px");
+
+		//####################################
+		//    Add div and layout for isoform plot
+		//####################################
+		grpBox = new Groupbox();
+		grpBox.setTitle("Isoform View");
+		grpBox.setParent(mainLayout);
+		grpBox.setMold("3d");
+		grpBox.setClosable(false);
+		m_layoutIsoformPlot = new Vlayout();
+		m_layoutIsoformPlot.setId("IsoformPlot");
+		m_layoutIsoformPlot.setParent(grpBox);		
+//		m_layoutIsoformPlot.setAttribute("org.zkoss.zul.nativebar", "true");
+		m_layoutIsoformPlot.setStyle("overflow: auto;");
+		m_layoutIsoformPlot.setHeight("600px");
 
 		//########################################
 		//    add buttons for setting selection 
@@ -1083,7 +1079,7 @@ public class SplicingWebApp extends Window
 		//        add list of AS hits
 		//########################################
 		Tabbox tabbox = new Tabbox();
-		tabbox.setHeight("470px");
+		tabbox.setVflex("min");
 		tabbox.setParent(layoutH);
 		
 		Tabs tabs = new Tabs();
@@ -1091,6 +1087,15 @@ public class SplicingWebApp extends Window
 		
 		Tabpanels panels = new Tabpanels();
 		panels.setParent(tabbox);
+		
+		tabs.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+		{
+			public void onEvent(Event event) throws Exception
+			{
+				Tabs tabs = (Tabs)event.getTarget();
+				tabs.invalidate();
+			}
+		});
 		
 		m_resultListHandler = new ResultListHandler(tabs, panels, m_hWindow);
 		
@@ -1202,15 +1207,15 @@ public class SplicingWebApp extends Window
 	}
 	
 	/** Returns the region (part of the GUI) that shows the coverage plots */
-	public North GetCoveragePlotRegion()
+	public Vlayout GetCoveragePlotRegion()
 	{
-		return m_layoutMainTop;
+		return m_layoutCoveragePlot;
 	}
 
 	/** Returns the region (part of the GUI) that shows the isoform plots */
 	public Vlayout GetIsoformPlotRegion()
 	{
-		return m_layoutMainBottom;
+		return m_layoutIsoformPlot;
 	}
 	
 	/** Returns the image map associated with the coverage plot */
@@ -1319,6 +1324,12 @@ public class SplicingWebApp extends Window
 	public AnalysisResultHandler GetResultHandler()
 	{
 		return m_vcASResults;
+	}
+	
+	/** Returns the result list handler that manages the result grid */
+	public ResultListHandler GetResultListHandler()
+	{
+		return m_resultListHandler;
 	}
 	
 	/** Returns the gene identifier handler that stores gene symbols and various gene IDs per gene */ 
@@ -1689,7 +1700,7 @@ public class SplicingWebApp extends Window
 		m_strSelectedConditionType		= null;
 		
 		m_projectModel.clear();
-		if(!m_projectModel.Init(strProjectFile, -1, -1, -1.0, -1, true))
+		if(!m_projectModel.Init(strProjectFile, -1, -1, -1.0, -1, true, false))
 		{
 			ErrorMessage.ShowError("Failed to open project: " + strProjectFile);
 			return;
@@ -1701,19 +1712,48 @@ public class SplicingWebApp extends Window
 			m_bDetectIntronRetentionEvents = false;
 			m_checkboxSkipIntronRetentionDetection.setChecked(m_bDetectIntronRetentionEvents);
 		}
+		
+		// read last used gene annotation file hashcode from file
+		String strFileIn = m_projectModel.GetFullPathOfProjectFile() + ".last_reference";
+		File pIn = new File(strFileIn);
+		if(pIn.exists())
+		{
+			Scanner pRefIn = new Scanner(pIn);
 
-		m_bandboxSelectedGene.setText("Select Gene");
+			String strRef = pRefIn.nextLine();
+			int nReferenceID = Integer.parseInt(strRef);
+			pRefIn.close();
+			
+			// select gene annotation file
+			for(Comboitem item : m_comboboxSelectedGeneAnnotation.getItems())
+			{
+				if(item.getValue().hashCode() == nReferenceID)
+				{
+					m_comboboxSelectedGeneAnnotation.setSelectedItem(item);
+					m_strFileGTF = item.getValue();
+					LoadGeneAnnotation(m_strFileGTF);
+					break;
+				}
+			}
+		}
 		
-		m_vcASResults.Clear();
-		m_dataSupplier.Clear();		
-		
+		// select first available condition type and condition
 		UpdateComboboxesForCondition();
-		
-		// select first available condition type
 		if(m_comboboxSelectedConditionType.getItemCount() > 0)
 		{
-			m_comboboxSelectedConditionType.setSelectedIndex(0);
-			m_strSelectedConditionType = m_comboboxSelectedConditionType.getSelectedItem().getLabel();
+			m_strSelectedConditionType = m_projectModel.GetFirstConditionType();
+//					m_comboboxSelectedConditionType.setSelectedIndex(0);
+//					m_strSelectedConditionType = m_comboboxSelectedConditionType.getSelectedItem().getLabel();
+			
+			for(Comboitem item : m_comboboxSelectedConditionType.getItems())
+			{
+				if(item.getLabel().equals(m_strSelectedConditionType))
+				{
+					m_comboboxSelectedConditionType.setSelectedItem(item);
+					break;
+				}
+			}
+			
 			OnConditionTypeChange();
 			
 			// select first available condition
@@ -1721,11 +1761,21 @@ public class SplicingWebApp extends Window
 			m_strSelectedCondition = m_comboboxSelectedCondition.getSelectedItem().getLabel();
 		}
 		
+		// update colors
+		UpdateColorSelection();
+
+		// clear the gene selection
+		m_bandboxSelectedGene.setText("Select Gene");
+		
+		// clear previous AS results and data in the data supplier
+		m_vcASResults.Clear();
+		m_dataSupplier.Clear();		
+		
 		//###########################################################################
 		//    load previously calculated alternative splicing hits, if available
 		//###########################################################################
 		String strResultFile = m_projectModel.GetProjectName() + "_splicing_results.dat";
-		File pIn = new File(m_strPathHitLists + "/" + strResultFile);
+		pIn = new File(m_strPathHitLists + "/" + strResultFile);
 		if(pIn.exists())
 		{
 			m_vcASResults.LoadHitList(m_strPathHitLists, strResultFile);			
@@ -1895,8 +1945,9 @@ public class SplicingWebApp extends Window
 		grpBox.setTitle("Settings");
 		grpBox.setMold("3d");
 		grpBox.setParent(parentLayout);
-		grpBox.setWidth("500px");
+		grpBox.setWidth("530px");
 		grpBox.setStyle("margin-left: 10px;");
+		grpBox.setClosable(false);
 		
 		Hlayout layoutH = new Hlayout();
 		layoutH.setParent(grpBox);
@@ -1915,7 +1966,7 @@ public class SplicingWebApp extends Window
 		// add box for window size specification
 		m_textboxWindowWidth = new Textbox("Enter value");
 		m_textboxWindowWidth.setParent(layoutH2);
-		m_textboxWindowWidth.setWidth("157px");
+		m_textboxWindowWidth.setWidth("177px");
 		m_textboxWindowWidth.setStyle("margin-left: 10px;");
 		
 		m_textboxWindowWidth.addEventListener(Events.ON_CHANGING, new EventListener<Event>()
@@ -2024,13 +2075,13 @@ public class SplicingWebApp extends Window
 		// add bandbox for project selection
 		m_bandboxProjects = new Bandbox("Select Project");
 		m_bandboxProjects.setParent(layoutV);
-		m_bandboxProjects.setWidth("180px");
+		m_bandboxProjects.setWidth("200px");
 		
 		// add bandpopup
-		Bandpopup bandpopup = new Bandpopup();
-		bandpopup.setParent(m_bandboxProjects);
-		bandpopup.setWidth("75%");
-		bandpopup.setHeight("75%");
+		m_bandpopupProjects = new Bandpopup();
+		m_bandpopupProjects.setParent(m_bandboxProjects);
+		m_bandpopupProjects.setWidth("75%");
+		m_bandpopupProjects.setHeight("75%");
 		
 		// create tree set of project information
 		File pFolder = new File(m_strPathInput);
@@ -2041,21 +2092,19 @@ public class SplicingWebApp extends Window
 			if(strFile.endsWith("project"))// || strFile.endsWith("project2"))
 			{
 				ProjectModel project = new ProjectModel();
-				project.Init(m_strPathInput + "/" + strFile, 0, 0, 0.0, 0, false);
+				project.Init(m_strPathInput + "/" + strFile, 0, 0, 0.0, 0, false, false);
 				m_vcProjectInfos.add(project);
 			}
 		}
 		
-		Listbox listboxProjects = new Listbox();
-		listboxProjects.setParent(bandpopup);		
-		listboxProjects.setHflex("min");
-		listboxProjects.setStyle("autoWidth:true");
-		listboxProjects.setMold("paging");
-		listboxProjects.setPageSize(10);
-		
+		m_listboxProjects = new Listbox();
+		m_listboxProjects.setParent(m_bandpopupProjects);		
+		m_listboxProjects.setHflex("min");
+		m_listboxProjects.setStyle("autoWidth:true");
+
 		Listhead listheadProject = new Listhead();
 		listheadProject.setSizable(true);
-		listheadProject.setParent(listboxProjects);
+		listheadProject.setParent(m_listboxProjects);
 		
 		Listheader listheaderID = new Listheader("Project ID");
 		listheaderID.setWidth("200px");
@@ -2086,8 +2135,8 @@ public class SplicingWebApp extends Window
 		listheaderProject.setWidth("200px");
 		listheaderProject.setHflex("min");
 		listheaderProject.setParent(listheadProject);
-		
-		listboxProjects.addEventListener(Events.ON_SELECT, new EventListener<Event>()
+	
+		m_listboxProjects.addEventListener(Events.ON_SELECT, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
 			{
@@ -2106,9 +2155,13 @@ public class SplicingWebApp extends Window
 			}
 		});
 		
-		// now add the sorted list of gene identifiers to the selection
+		// fill the first page with project data
+		int nCurProject = 0;
 		for(ProjectModel project : m_vcProjectInfos)
 		{
+			if(nCurProject == PROJECT_PAGING_SIZE)
+				break;
+			
 			Listitem item = new Listitem();
 			item.setValue(project);
 			
@@ -2143,8 +2196,90 @@ public class SplicingWebApp extends Window
 			cell.setParent(item);
 //			""+project.GetConditionsToConditionTypes()); cell.setParent(item);
 			
-			listboxProjects.appendChild(item);
+			m_listboxProjects.appendChild(item);
+			
+			nCurProject++;
 		}
+		
+		// Add paging component
+		m_pagingProjects = new Paging();
+		m_pagingProjects.setParent(m_bandpopupProjects);
+		m_pagingProjects.setDetailed(true);
+
+		m_pagingProjects.addEventListener("onPaging", new EventListener<Event>()
+		{
+			public void onEvent(Event event) throws Exception
+			{
+				PagingEvent pe = (PagingEvent) event;
+				int nCurrentPage = pe.getActivePage();
+
+				int nStartItem = nCurrentPage * PROJECT_PAGING_SIZE;
+				m_listboxProjects.getItems().clear();
+				
+				// fill the current page with project data
+				int nCurProject = 0;
+				for(ProjectModel project : m_vcProjectInfos)
+				{
+					if(nCurProject < nStartItem)
+					{
+						nCurProject++;
+						continue;
+					}
+					
+					if(nCurProject == nStartItem+PROJECT_PAGING_SIZE)
+						break;
+					
+					Listitem item = new Listitem();
+					item.setValue(project);
+					
+					Listcell cell = new Listcell(""+project.GetProjectName().hashCode()); cell.setParent(item);
+					cell = new Listcell(project.GetProjectName()); cell.setParent(item);
+					cell = new Listcell(project.GetCreationDate()); cell.setParent(item);
+					cell = new Listcell(""+project.GetSamples().size()); cell.setParent(item);
+					
+					if(project.ProjectHasPairedData())
+					{
+						cell = new Listcell("yes"); cell.setParent(item);
+					}
+					else
+					{
+						cell = new Listcell("no"); cell.setParent(item);
+					}
+					
+					int nIdx = 0;
+					cell = new Listcell();			
+					for(String strConditionType : project.GetConditionsToConditionTypes().keySet())
+					{
+						if(nIdx != 0)
+						{
+							Separator sep = new Separator();
+							sep.setParent(cell);
+						}
+						String strLabel = strConditionType + ": " + project.GetConditionsToConditionTypes().get(strConditionType);
+						Label lab = new Label(strLabel); lab.setParent(cell);
+						nIdx++;
+					}
+
+					cell.setParent(item);
+					
+					m_listboxProjects.appendChild(item);
+					
+					nCurProject++;
+				}
+				
+				// some dirty code to enforce a maximum width on the bandbox
+				m_bandpopupProjects.setHflex("min");
+				String strMaxWidth = "max-width: " + (m_plotFactory.GetClientSize()[0] * 0.75) + "px;";
+				m_bandpopupProjects.setStyle(strMaxWidth);
+				m_bandpopupProjects.setZclass(strMaxWidth);
+
+				Clients.resize(m_bandpopupProjects);
+				
+				// also adjust the paging object
+//				m_pagingProjects.setHflex("min");
+				Clients.resize(m_pagingProjects);
+			}
+		});
 		
 		m_bandboxProjects.addEventListener(Events.ON_OK, new EventListener<Event>()
 		{
@@ -2175,21 +2310,21 @@ public class SplicingWebApp extends Window
 		layoutH.setParent(grpBox);
 		
 		layoutV = new Vlayout();
+		layoutV.setStyle("margin-left: 10px");
 		layoutV.setParent(layoutH);
 		
 		// add label for gene identifier selection
 		lab = new Label("Selected Gene:");
-		lab.setStyle("margin-left: 10px");
 		lab.setParent(layoutV);
 		
 		// add text box for gene identifier selection
 		m_bandboxSelectedGene = new Bandbox();
 		m_bandboxSelectedGene.setParent(layoutV);
 		m_bandboxSelectedGene.setMold("rounded");
-		m_bandboxSelectedGene.setStyle("padding-left: 10px;");
+//		m_bandboxSelectedGene.setStyle("padding-left: 10px;");
 		m_bandboxSelectedGene.setAutodrop(true);
 		m_bandboxSelectedGene.setVflex("true");
-//		m_bandboxSelectedGene.setWidth("170px");
+		m_bandboxSelectedGene.setWidth("200px");
 		
 		Bandpopup popup = new Bandpopup();
 		popup.setParent(m_bandboxSelectedGene);
@@ -2222,7 +2357,7 @@ public class SplicingWebApp extends Window
 		
 		m_comboboxSelectedGeneAnnotation = new Combobox("Select Gene Annotation");
 		m_comboboxSelectedGeneAnnotation.setParent(layoutV);
-		m_comboboxSelectedGeneAnnotation.setWidth("180px");
+		m_comboboxSelectedGeneAnnotation.setWidth("200px");
 		pFolder = new File(m_strPathReferences);
 		int nIdx = -1;
 		int i = 0;
@@ -2260,6 +2395,17 @@ public class SplicingWebApp extends Window
 					String strText = (String)box.getSelectedItem().getValue();
 					m_strFileGTF = strText;
 					LoadGeneAnnotation(m_strFileGTF);
+					
+					// save last used gene annotation for project
+					if(m_projectModel == null || !m_projectModel.IsReady())
+						return;
+					
+					// save reference ID to file. The program will try to load the last reference
+					// used on changing the project.
+					String strOut = m_projectModel.GetFullPathOfProjectFile() + ".last_reference";
+					PrintWriter pOut = new PrintWriter(new File(strOut));
+					pOut.println(m_strFileGTF.hashCode());
+					pOut.close();
 				}
 			}
 		});
@@ -2288,10 +2434,12 @@ public class SplicingWebApp extends Window
 				// get first letter
 				if(strInput != null && strInput.length() > 0)
 				{
-					TreeSet<GeneIdentifier> vcGeneIdentifier = new TreeSet<GeneIdentifier>();
+					TreeSet<GeneIdentifier> vcGeneIdentifiers = new TreeSet<GeneIdentifier>();
+
+					Vector<GeneIdentifier> vcIdentifiers = m_geneIdentifierHandler.GetAllUniqueGeneIdentifiers();
 
 					// get list of valid gene identifiers
-					for(GeneIdentifier gid : m_geneIdentifierHandler.GetAllGeneIdentifiersStartingWith(strInput))
+					for(GeneIdentifier gid : vcIdentifiers)
 					{
 						if(gid.m_bIsValid)
 						{
@@ -2309,24 +2457,135 @@ public class SplicingWebApp extends Window
 								
 								if(strID.startsWith(strInput))
 								{
-									vcGeneIdentifier.add(gid);
+									vcGeneIdentifiers.add(gid);
 								}
 							}
 						}
+						
+						if(gid.m_strSynonyms.contains(strInput))
+						{
+							vcGeneIdentifiers.add(gid);
+						}
 					}
 					
-					// now add the sorted list of gene identifiers to the selection
-					for(GeneIdentifier gid : vcGeneIdentifier)
+					// sort gene identifiers by:
+					// #1 complete matches
+					// #2 same start string
+					// #3 synonyms
+					
+					TreeSet<GeneIdentifier> vcFullMatch 	= new TreeSet<GeneIdentifier>();
+					TreeSet<GeneIdentifier> vcPartialMatch  = new TreeSet<GeneIdentifier>();
+					TreeSet<GeneIdentifier> vcSynonyms		= new TreeSet<GeneIdentifier>();
+					
+					for(GeneIdentifier gid : vcGeneIdentifiers)
 					{
-						Listitem item = new Listitem();
-						Listcell cell = new Listcell(gid.m_strApprovedGeneSymbol); cell.setParent(item);
-						item.setValue(gid.m_strEnsemblGeneID);
-						cell = new Listcell(gid.m_strEnsemblGeneID); cell.setParent(item);
-						cell = new Listcell(gid.m_strRefGeneID); cell.setParent(item);
-						cell = new Listcell(gid.m_strEntrezGeneID); cell.setParent(item);
-						cell = new Listcell(gid.m_strSynonyms); cell.setParent(item);
-						cell = new Listcell(gid.m_strApprovedGeneName); cell.setParent(item);
-						m_listboxSelectedGene.appendChild(item);
+						if(gid.m_strApprovedGeneSymbol.startsWith(strInput))
+						{
+							if(gid.m_strApprovedGeneSymbol.equals(strInput))
+								vcFullMatch.add(gid);
+							else
+								vcPartialMatch.add(gid);
+							continue;
+						}
+						
+						if(gid.m_strSynonyms.contains(strInput))
+						{
+							boolean bFullMatch = false;
+							String pSplit[] = gid.m_strSynonyms.split(", ");
+							for(String strName : pSplit)
+							{
+								// separate matching synonyms from the others
+								if(strName.equals(strInput))
+								{
+									vcFullMatch.add(gid);
+									bFullMatch = true;
+								}
+							}
+							
+							if(!bFullMatch)
+								vcSynonyms.add(gid);
+						}
+					}
+
+					// add 'real' matches first, then use synonyms
+					for(int i=0; i<3; i++)
+					{
+						switch(i)
+						{
+							case 0: vcGeneIdentifiers = vcFullMatch; break;
+							case 1: vcGeneIdentifiers = vcPartialMatch; break;
+							case 2: vcGeneIdentifiers = vcSynonyms; break;
+						}
+						
+						// now add the sorted list of gene identifiers to the selection
+						for(GeneIdentifier gid : vcGeneIdentifiers)
+						{
+							// valid items must have the correct gene symbol or synonym
+							boolean bIsValid = false;
+							
+							Listitem item = new Listitem();
+							Listcell cell = new Listcell(gid.m_strApprovedGeneSymbol); cell.setParent(item);
+							if(gid.m_strApprovedGeneSymbol.startsWith(strInput))
+							{
+								cell.setStyle("font-weight: bold; color: blue");
+								bIsValid = true;
+							}
+							item.setValue(gid.m_strEnsemblGeneID);
+							cell = new Listcell(gid.m_strEnsemblGeneID); cell.setParent(item);						
+							cell = new Listcell(gid.m_strRefGeneID); cell.setParent(item);
+							cell = new Listcell(gid.m_strEntrezGeneID); cell.setParent(item);
+							if(gid.m_strSynonyms.contains(strInput))
+							{
+								cell = new Listcell();
+								cell.setParent(item);
+								
+								Vector<String> vcHit = new Vector<String>();
+								Vector<String> vcOther = new Vector<String>();
+								String pSplit[] = gid.m_strSynonyms.split(", ");
+								
+								for(String strName : pSplit)
+								{
+									// separate matching synonyms from the others
+									if(strName.startsWith(strInput))
+									{
+										vcHit.add(strName);
+										bIsValid = true;
+									}
+									else
+									{
+										vcOther.add(strName);
+									}
+								}
+								
+								String strText = "<b><span style=\"color: blue\">";
+								boolean bFirst = true;
+								for(String strName : vcHit)
+								{
+									if(!bFirst)
+										strText += ", ";
+	
+									strText += strName;
+								}
+								
+								 strText += "</span></b>";
+								
+								for(String strName : vcOther)
+								{
+									strText += ", " + strName;
+								}
+	
+								Html html = new Html(strText);
+								html.setParent(cell);
+							}
+							else
+							{
+								cell = new Listcell(gid.m_strSynonyms); cell.setParent(item);
+							}
+							cell = new Listcell(gid.m_strApprovedGeneName); cell.setParent(item);
+							
+							if(bIsValid)
+								m_listboxSelectedGene.appendChild(item);
+						}
 					}
 				}
 			}
@@ -2399,15 +2658,17 @@ public class SplicingWebApp extends Window
 		grpBox.setTitle("Options");
 		grpBox.setMold("3d");
 		grpBox.setParent(parentLayout);
-		grpBox.setWidth("500px");
+		grpBox.setWidth("530px");
 		grpBox.setStyle("margin-left: 10px;");
-		grpBox.setVflex("true");
-		
+		grpBox.setVflex("min");
+		grpBox.setClosable(false);
+	
 		Hlayout layoutH = new Hlayout();
+		layoutH.setVflex("min");
 		layoutH.setParent(grpBox);
 		
 		Vlayout layoutV = new Vlayout();
-		layoutV.setHflex("true");
+		layoutV.setHflex("min");
 		layoutV.setParent(layoutH);
 		
 		Label label = new Label("Isoform view options");
@@ -2768,34 +3029,14 @@ public class SplicingWebApp extends Window
 		grpBox.setParent(parentLayout);
 		grpBox.setWidth("440px");
 		grpBox.setHeight("490px");
-
+		
+		//#############################################################
 		Hlayout layoutH = new Hlayout();
 		layoutH.setParent(grpBox);
 		
 		Vlayout layoutV = new Vlayout();
 		layoutV.setWidth("220px");
 		layoutV.setParent(layoutH);
-		
-		//#############################################################
-		layoutH = new Hlayout();
-		layoutH.setStyle("margin-top: 20px");
-		layoutH.setParent(grpBox);
-		
-		layoutV = new Vlayout();
-		layoutV.setWidth("220px");
-		layoutV.setParent(layoutH);
-
-		m_checkboxShowSecondCoveragePlot = new Checkbox("Attach coverage plot to isoforms");
-		m_checkboxShowSecondCoveragePlot.setParent(layoutV);
-		m_checkboxShowSecondCoveragePlot.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-		{
-			public void onEvent(Event event) throws Exception
-			{
-				m_plotFactory.ShowSecondCoveragePlot(m_checkboxShowSecondCoveragePlot.isChecked());
-				m_plotFactory.RequestCoverageRedraw();
-				m_plotFactory.DrawPlots();
-			}
-		});
 		
 		m_checkboxCoverageGrid = new Checkbox("Show coverage plot grid");
 		m_checkboxCoverageGrid.setParent(layoutV);
@@ -3122,7 +3363,7 @@ public class SplicingWebApp extends Window
 		Button btnGetURL = new Button("Generate HTML link for current view");
 		btnGetURL.setParent(layoutV);
 		btnGetURL.setClass("button blue");
-		btnGetURL.setStyle("margin-top: 40px; margin-bottom: 10px;");
+		btnGetURL.setStyle("margin-top: 80px; margin-bottom: 10px;");
 		
 		m_txtboxURL = new Textbox();
 		m_txtboxURL.setParent(layoutV);
@@ -3485,12 +3726,30 @@ public class SplicingWebApp extends Window
 		m_textboxMinJunctionReads.setText(""+m_nMinJunctionReads);
 		m_textboxVariableExonThreshold.setText(""+m_fVariableExonThreshold);
 		
-		if(m_selectedResult.GetGeneSymbol().isEmpty())
-			m_bandboxSelectedGene.setValue(m_selectedResult.GetGeneID().split("\\.")[0]);
+		GeneIdentifier gid = null;
+		if(m_selectedResult.GetGeneID().isEmpty())
+		{
+			gid = m_geneIdentifierHandler.GetGeneIdentifierForGene(m_selectedResult.GetGeneSymbol(), null);
+			
+			if(gid == null)
+			{
+				ErrorMessage.ShowError("Can't find gene ID for gene: " + m_selectedResult.GetGeneSymbol());
+				return;
+			}
+			
+			m_selectedResult.SetGeneID(gid.m_strEnsemblGeneID);
+		}
+		else
+			gid = m_geneIdentifierHandler.GetGeneIdentifierForGene(m_selectedResult.GetGeneID().split("\\.")[0], null);
+		
+		if(m_selectedResult.GetGeneSymbol().isEmpty() || !gid.m_strApprovedGeneSymbol.equals(m_selectedResult.GetGeneSymbol()))
+			m_bandboxSelectedGene.setValue(gid.m_strEnsemblGeneID);
 		else
 			m_bandboxSelectedGene.setValue(m_selectedResult.GetGeneSymbol());
 		
-		if(!m_strFileGTF.equals(m_selectedResult.GetGTFFile()))
+		
+		// switch gene annotation if the result specified a different one
+		if(!m_selectedResult.GetGTFFile().isEmpty() && !m_strFileGTF.equals(m_selectedResult.GetGTFFile()))
 		{
 			m_strFileGTF = m_selectedResult.GetGTFFile();
 			LoadGeneAnnotation(m_strFileGTF);
@@ -3503,6 +3762,7 @@ public class SplicingWebApp extends Window
 			}
 		}
 		
+		// check whether the selected gene is a new gene
 		boolean bSameGene = m_selectedResult.GetGeneID().equals(strOldGeneID);
 		if(!bSameGene)
 		{
@@ -3512,38 +3772,194 @@ public class SplicingWebApp extends Window
 		
 		m_vcValidIsoforms = m_selectedResult.GetValidIsoforms(m_dataSupplier);
 
-		m_vcPreviouslySelectedIsoforms.clear();
-		m_treeSelectedIsoforms.clearSelection();
-		
-		for(Treeitem item : m_treeSelectedIsoforms.getItems())
+		if(m_vcValidIsoforms.size() > 0)
 		{
-			String strID = item.getLabel();
+			m_vcPreviouslySelectedIsoforms.clear();
+			m_treeSelectedIsoforms.clearSelection();
 			
-			for(String strIsoform : m_vcValidIsoforms)
+			for(Treeitem item : m_treeSelectedIsoforms.getItems())
 			{
-				m_vcPreviouslySelectedIsoforms.add(strIsoform);
+				String strID = item.getLabel();
 				
-				if(strID.equals(strIsoform.split("\\.")[0]))
+				for(String strIsoform : m_vcValidIsoforms)
 				{
-					m_treeSelectedIsoforms.addItemToSelection(item);
+					m_vcPreviouslySelectedIsoforms.add(strIsoform);
+					
+					if(strID.equals(strIsoform.split("\\.")[0]))
+					{
+						m_treeSelectedIsoforms.addItemToSelection(item);
+					}
+				}
+			}			
+		}
+		else // select find isoforms matching to the variable exon in the result
+		{
+			boolean bIsoformSelectionFinished = false;
+			Vector<String> vcValidIsoforms = new Vector<String>();
+			
+			// step 1: Try to find matching isoforms based on junction reads
+			if(res.HasPSIScore())
+			{
+				boolean bFoundIsoformForInclusion = false;
+				boolean bFoundIsoformForExclusion = false;
+				
+				CountElement junIncl = res.GetInclusionJunction();
+				CountElement junExcl = res.GetExclusionJunction();
+				
+				for(String strIsoform : m_dataSupplier.GetIsoformNames())
+				{
+					TreeSet<CountElement> vcJunctions = m_dataSupplier.GetJunctionsForIsoform(strIsoform);
+					if(vcJunctions == null)
+						continue;
+					
+					if(vcJunctions.contains(junIncl))
+					{
+						bFoundIsoformForInclusion = true;
+						vcValidIsoforms.add(strIsoform);
+						break;
+					}
+					
+					if(vcJunctions.contains(junExcl))
+					{
+						bFoundIsoformForExclusion = true;
+						vcValidIsoforms.add(strIsoform);
+						break;
+					}
+				}
+				
+				// add isoform for unknown junctions
+				if(bFoundIsoformForExclusion && !bFoundIsoformForInclusion)
+				{
+					m_plotFactory.AddUnknownJunction(junIncl);
+					bIsoformSelectionFinished = true;
+				}
+				
+				if(bFoundIsoformForInclusion && !bFoundIsoformForExclusion)
+				{
+					m_plotFactory.AddUnknownJunction(junExcl);
+					bIsoformSelectionFinished = false;
 				}
 			}
-		}
-
-		// check whether the selected gene is a new gene
-		OnIsoformChange(!bSameGene);
-		
-		// check if any of the junctions is not annotated
-		if(m_selectedResult.HasPSIScore())
-		{
-			if(m_dataSupplier.IsNovelJunction(m_selectedResult.GetInclusionJunction()))
+			
+			if(!bIsoformSelectionFinished && res.HasAltExonA())
 			{
-				m_plotFactory.AddUnknownJunction(m_selectedResult.GetInclusionJunction());
+				Vector<String> vcFullMatchInclusion = new Vector<String>();
+				Vector<String> vcOverlappingInclusion = new Vector<String>();
+				Vector<String> vcSkipping = new Vector<String>();
+				
+				int nOldDist = 0; // defines how similar the closes matching exon is
+				Exon exonClosestMatch = null;
+				
+				// step 2: Find matching isoforms based on the overlap to a meta exon
+				for(String strIsoform : m_dataSupplier.GetIsoformNames())
+				{
+					Exon pExons[] = m_dataSupplier.GetExonsForIsoform(strIsoform);					
+					
+					// find overlap to isoform exons
+					for(Exon ex : pExons)
+					{
+						if(res.GetStartA() == ex.getCodingStart() && res.GetEndA() == ex.getCodingStop())
+						{
+							vcFullMatchInclusion.add(strIsoform);
+							break;
+						}
+						else if(res.GetStartA() >= ex.getCodingStart() && res.GetEndA() <= ex.getCodingStop())
+						{
+							if(exonClosestMatch == null)
+							{
+								exonClosestMatch = ex;
+								nOldDist = Math.abs(ex.getCodingStart() - res.GetStartA()) + Math.abs(ex.getCodingStop() - res.GetEndA());
+								vcOverlappingInclusion.add(strIsoform);
+							}
+							else
+							{
+								int nNewDist = Math.abs(ex.getCodingStart() - res.GetStartA()) + Math.abs(ex.getCodingStop() - res.GetEndA());
+								
+								if(nNewDist < nOldDist)
+								{
+									exonClosestMatch = ex;
+									nOldDist = nNewDist;
+									vcOverlappingInclusion.clear();
+									vcOverlappingInclusion.add(strIsoform);
+								}
+								else if(nNewDist == nOldDist)
+								{
+									vcOverlappingInclusion.add(strIsoform);
+								}
+							}
+							
+							break;
+						}
+					}
+
+					// find junctions that support skipping of the exon
+					TreeSet<CountElement> vcJunctions = m_dataSupplier.GetJunctionsForIsoform(strIsoform);
+					for(CountElement jun : vcJunctions)
+					{
+						if(vcJunctions == null)
+							continue;
+						
+						if(res.GetStartA() > jun.m_nStart && res.GetEndA() < jun.m_nEnd)
+						{
+							vcSkipping.add(strIsoform);
+							break;
+						}
+					}
+				}
+				
+				if(vcFullMatchInclusion.size() > 0)
+				{
+					vcValidIsoforms.addAll(vcFullMatchInclusion);
+					bIsoformSelectionFinished = true;
+				}
+				else if(vcOverlappingInclusion.size() > 0)
+				{
+					vcValidIsoforms.addAll(vcOverlappingInclusion);
+					bIsoformSelectionFinished = true;
+					
+					res.GetAltExonA().m_nStart = exonClosestMatch.getCodingStart();
+					res.GetAltExonA().m_nEnd   = exonClosestMatch.getCodingStop();
+				}
+				
+				if(bIsoformSelectionFinished)
+					vcValidIsoforms.addAll(vcSkipping);
 			}
 			
-			if(m_dataSupplier.IsNovelJunction(m_selectedResult.GetExclusionJunction()))
+			if(!bIsoformSelectionFinished)
 			{
-				m_plotFactory.AddUnknownJunction(m_selectedResult.GetExclusionJunction());
+				for(String strIsoform : m_dataSupplier.GetIsoformNames())
+					vcValidIsoforms.add(strIsoform);
+			}
+			
+			m_vcValidIsoforms.clear();
+			m_vcPreviouslySelectedIsoforms.clear();
+			m_treeSelectedIsoforms.clearSelection();
+		
+			for(String strIsoform : vcValidIsoforms)
+			{
+				m_vcValidIsoforms.add(strIsoform);
+				m_vcPreviouslySelectedIsoforms.add(strIsoform);
+			}
+
+			for(Treeitem item : m_treeSelectedIsoforms.getItems())
+			{
+				if(m_vcValidIsoforms.contains(item.getValue()))
+					m_treeSelectedIsoforms.addItemToSelection(item);
+			}
+		}
+		OnIsoformChange(!bSameGene);
+		
+		// check if any of the junctions is not annotated (not available for imported results)
+		if(res.HasPSIScore() && res.GetResultSource() == -1)
+		{
+			if(m_dataSupplier.IsNovelJunction(res.GetInclusionJunction()))
+			{
+				m_plotFactory.AddUnknownJunction(res.GetInclusionJunction());
+			}
+			
+			if(m_dataSupplier.IsNovelJunction(res.GetExclusionJunction()))
+			{
+				m_plotFactory.AddUnknownJunction(res.GetExclusionJunction());
 			}
 		}
 	}
@@ -3969,7 +4385,7 @@ public class SplicingWebApp extends Window
 		if(m_comboboxSelectedCondition == null)
 		{
 			m_comboboxSelectedConditionType = new Combobox("Select Condition Type");
-			m_comboboxSelectedConditionType.setWidth("180px");
+			m_comboboxSelectedConditionType.setWidth("200px");
 			
 			m_comboboxSelectedConditionType.setParent(layoutV);
 			m_comboboxSelectedConditionType.addEventListener(Events.ON_SELECT, new EventListener<Event>()
@@ -3998,7 +4414,7 @@ public class SplicingWebApp extends Window
 		if(m_comboboxSelectedCondition == null)
 		{
 			m_comboboxSelectedCondition = new Combobox("Select Condition");
-			m_comboboxSelectedCondition.setWidth("180px");
+			m_comboboxSelectedCondition.setWidth("200px");
 			m_comboboxSelectedCondition.setParent(layoutV);
 			m_comboboxSelectedCondition.addEventListener(Events.ON_SELECT, new EventListener<Event>()
 			{
@@ -4485,12 +4901,12 @@ public class SplicingWebApp extends Window
 		// init project
 		try
 		{
-			if(!m_projectModel.Init(strFileProject, -1, -1, -1.0, -1, true))
+			if(!m_projectModel.Init(strFileProject, -1, -1, -1.0, -1, true, true))
 				return false;
 		}
 		catch(Exception e)
 		{
-			System.out.println("failed to process project file: " + strFileProject);
+			ErrorMessage.ShowError("failed to process project file: " + strFileProject);
 			System.out.println(ExceptionUtils.getStackTrace(e));
 			return false;
 		}
@@ -4501,7 +4917,7 @@ public class SplicingWebApp extends Window
 
 		if(this.m_nReferenceType == REFFLAT_REFERENCE_FILE)
 		{
-			System.out.println("can't calculate size factors with refflat file -> GTF format required");
+			ErrorMessage.ShowError("can't calculate size factors with refflat file -> GTF format required");
 			return false;
 		}
 		
@@ -4964,7 +5380,7 @@ public class SplicingWebApp extends Window
 				}
 				catch(Exception e)
 				{
-					System.out.println("failed to open GFF file: " + m_strFileGTF);
+					ErrorMessage.ShowError("failed to open GFF file: " + m_strFileGTF);
 					e.printStackTrace();
 					return;
 				}
@@ -4979,7 +5395,7 @@ public class SplicingWebApp extends Window
 			}
 			catch(Exception e)
 			{
-				System.out.println("failed to open file: " + strFileIdx);
+				ErrorMessage.ShowError("failed to open file: " + strFileIdx);
 				e.printStackTrace();
 				return;
 			}
@@ -5032,8 +5448,8 @@ public class SplicingWebApp extends Window
 		}
 		catch(Exception e)
 		{
+			ErrorMessage.ShowError("failed to topen file: " + m_strFileDEXSeqIDs);
 			e.printStackTrace();
-			System.out.println("failed to topen file: " + m_strFileDEXSeqIDs);
 			return null;
 		}
 		
@@ -5120,7 +5536,7 @@ public class SplicingWebApp extends Window
 			}
 			catch(Exception e)
 			{
-				System.out.println("failed to open file: " + strFile);
+				ErrorMessage.ShowError("failed to open file: " + strFile);
 				e.printStackTrace();
 			}
 			
@@ -5267,11 +5683,11 @@ public class SplicingWebApp extends Window
 	{
 		try
 		{
-			m_projectModel.Init(strFileProject, -1, -1, -1.0, -1, true);
+			m_projectModel.Init(strFileProject, -1, -1, -1.0, -1, true, false);
 		}
 		catch(Exception e)
 		{
-			System.out.println("failed to open project file: " + strFileProject);
+			ErrorMessage.ShowError("Failed to open project file: " + strFileProject);
 			return;
 		}
 	}
@@ -5333,6 +5749,13 @@ public class SplicingWebApp extends Window
 		}
 		
 		return strRes;
+	}
+
+	@Override
+	public void afterCompose()
+	{
+		m_pagingProjects.setPageSize(PROJECT_PAGING_SIZE);
+		m_pagingProjects.setTotalSize(m_vcProjectInfos.size());		
 	}
 
 }

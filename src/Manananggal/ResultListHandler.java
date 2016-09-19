@@ -39,6 +39,7 @@ import org.zkoss.zul.Area;
 import org.zkoss.zul.Bandbox;
 import org.zkoss.zul.Bandpopup;
 import org.zkoss.zul.Button;
+import org.zkoss.zul.Cell;
 import org.zkoss.zul.Checkbox;
 import org.zkoss.zul.Column;
 import org.zkoss.zul.Columns;
@@ -68,13 +69,22 @@ import org.zkoss.zul.Window;
 */
 public class ResultListHandler
 {
+	static final int GRID_TYPE_PERMANENT	= 0;
+	static final int GRID_TYPE_TEMPORARY	= 1;
+	static final int GRID_TYPE_IMPORT		= 2;
+	
 	private Tabs 				m_Tabs;
 	private Tabpanels 			m_Panels;
 	
 	private Grid				m_gridHitList;
 	private Grid				m_gridTmpHitList;
-	private ResultFilterRule	m_resultFilterRule;
+	private Grid				m_gridImportedResults;
+	private ResultFilterRule	m_resultFilterRulePermanentList;
+	private ResultFilterRule	m_resultFilterRuleTemporaryList;
+	private ResultFilterRule	m_resultFilterRuleImportedList;
+	private MyFileUploadDlg		m_FileUploadDlg;
 	
+	private Vector<AnalysisResult> m_vcImportedResults;
 	private AnalysisResultHandler m_resultHandler;
 	
 	SplicingWebApp				m_App;
@@ -85,10 +95,16 @@ public class ResultListHandler
 		m_Panels		= panels;
 		m_App			= app;
 		
-		m_resultFilterRule = new ResultFilterRule();
+		m_resultFilterRulePermanentList = new ResultFilterRule();
+		m_resultFilterRuleTemporaryList = new ResultFilterRule();
+		m_resultFilterRuleImportedList  = new ResultFilterRule();
 
 		AddPermanentResultList();
 		AddTemporaryResultList();
+		AddImportTab();
+		
+		m_vcImportedResults = new Vector<AnalysisResult>();
+		m_FileUploadDlg = new MyFileUploadDlg(m_App);
 	}
 
 	/** Clears all data in the result table */
@@ -103,6 +119,8 @@ public class ResultListHandler
 			m_gridHitList.setMold("paging");
 			m_gridHitList.setPageSize(10);
 		}
+
+		m_vcImportedResults.clear();
 	}
 	
 	/**
@@ -124,13 +142,31 @@ public class ResultListHandler
 		m_gridHitList = new Grid();
 		m_gridHitList.setId("hitlist");
 		m_gridHitList.setParent(layoutV);
-		m_gridHitList.setHeight("380px");
 		m_gridHitList.setVflex("min");
 		m_gridHitList.setHflex("min");
 		m_gridHitList.setMold("paging");
 		m_gridHitList.setPageSize(10);
 		
-		layoutV.setHeight("440px");
+		m_gridHitList.addEventListener("onPaging", new EventListener<Event>()
+		{
+			@Override
+			public void onEvent(Event event) throws Exception
+			{
+				m_Tabs.invalidate(); // if we don't force a redraw of the tabs, the grid will be truncated
+			}
+			
+		});
+		
+		m_gridHitList.addEventListener(Events.ON_SORT, new EventListener<Event>()
+		{
+			@Override
+			public void onEvent(Event event) throws Exception
+			{
+				m_Tabs.invalidate(); // if we don't force a redraw of the tabs, the grid will be truncated
+			}
+			
+		});
+		layoutV.setVflex("min");
 		
 		Button btnSaveHitList = new Button("Save changes");
 		btnSaveHitList.setParent(layoutV);
@@ -168,13 +204,22 @@ public class ResultListHandler
 		m_gridTmpHitList = new Grid();
 		m_gridTmpHitList.setId("tmpHitList");
 		m_gridTmpHitList.setParent(layoutV);
-		m_gridTmpHitList.setHeight("380px");
 		m_gridTmpHitList.setVflex("min");
 		m_gridTmpHitList.setHflex("min");
 		m_gridTmpHitList.setMold("paging");
 		m_gridTmpHitList.setPageSize(10);
+		
+		m_gridTmpHitList.addEventListener("onPaging", new EventListener<Event>()
+		{
+			@Override
+			public void onEvent(Event event) throws Exception
+			{
+				m_Tabs.invalidate(); // if we don't force a redraw of the tabs, the grid will be truncated
+			}
+			
+		});
 
-		layoutV.setHeight("440px");
+		layoutV.setVflex("min");
 		
 		Button btnSaveHitList = new Button("Add selection to curated results");
 		btnSaveHitList.setParent(layoutV);
@@ -194,7 +239,7 @@ public class ResultListHandler
 				
 				for(Row row : rows)
 				{
-					Checkbox checkbox = (Checkbox)row.getFirstChild();
+					Checkbox checkbox = (Checkbox)row.getFirstChild().getFirstChild();
 					
 					if(checkbox.isChecked())
 					{
@@ -217,12 +262,75 @@ public class ResultListHandler
 	}
 
 	/**
+	 *    Adds a tab for the import of AS events generated
+	 *    outside the web application (e.g. by Manananggal,
+	 *    DEXSeq, rMATS, JSplice or Cuffdiff)
+	 */
+	private void AddImportTab()
+	{
+		Tab tab = new Tab("Imported Results");
+		tab.setParent(m_Tabs);
+		
+		Tabpanel panel = new Tabpanel();
+		panel.setVflex("min");
+		panel.setHflex("min");
+		panel.setParent(m_Panels);
+		
+		Vlayout layoutV = new Vlayout();
+		layoutV.setParent(panel);
+		
+		m_gridImportedResults = new Grid();
+		m_gridImportedResults.setId("importedHitList");
+		m_gridImportedResults.setParent(layoutV);
+		m_gridImportedResults.setVflex("min");
+		m_gridImportedResults.setHflex("min");
+		m_gridImportedResults.setMold("paging");
+		m_gridImportedResults.setPageSize(10);
+		
+		m_gridImportedResults.addEventListener("onPaging", new EventListener<Event>()
+		{
+			@Override
+			public void onEvent(Event event) throws Exception
+			{
+				m_Tabs.invalidate(); // if we don't force a redraw of the tabs, the grid will be truncated
+			}
+			
+		});
+
+		layoutV.setVflex("min");
+		layoutV.setHflex("min");
+		
+		Button btnUpload = new Button("Import AS results");
+		btnUpload.setParent(layoutV);
+		btnUpload.setSclass("button orange");
+		btnUpload.setStyle("margin-left: 4px;");
+		btnUpload.setWidth("200px");
+		
+		btnUpload.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+		{
+			@Override
+			public void onEvent(Event event) throws Exception
+			{
+				if(!m_App.GetProjectModel().IsReady())
+				{
+					Messagebox.show("You need to select a project first");
+					return;
+				}
+				
+				m_FileUploadDlg.Show();
+			}
+			
+		});
+	}
+	
+	/**
 	 *    Adds the menu for the splicing type filter to the corresponding
 	 *    column in the result table.
 	 */
-	private void AddSplicingTypeFilter(Column parent)
+	private void AddSplicingTypeFilter(Column parent, int nGridType, int nDataType, int nColIdx)
 	{		
 		Bandbox bandBox = new Bandbox();
+		bandBox.setId("bbSplicingTypeFilter_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		bandBox.setStyle("position: absolute; right: 0px; margin-right: 10px");
 		bandBox.setWidth("30px");
 		bandBox.setParent(parent);
@@ -235,30 +343,82 @@ public class ResultListHandler
 		layout.setParent(bandPopup);
 		
 		Button btnSelectAll = new Button("Select All");
+		btnSelectAll.setId("btnSelectAllASTypes_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnSelectAll.setParent(layout);
 		btnSelectAll.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
 			{
 				for(int i=0; i<13; i++)
-					m_resultFilterRule.ShowASType(i);
-				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				{
+					Button btn = (Button)event.getTarget();
+					int nGridType = Integer.parseInt(btn.getId().split("_")[1]);
+					int nDataType = Integer.parseInt(btn.getId().split("_")[2]);
+					
+					switch(nGridType)
+					{
+						case GRID_TYPE_PERMANENT:
+						{
+							m_resultFilterRulePermanentList.ShowASType(i);
+							UpdatePermanentResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_TEMPORARY:
+						{
+							m_resultFilterRuleTemporaryList.ShowASType(i);
+							UpdateTemporaryResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_IMPORT:
+						{
+							m_resultFilterRuleImportedList.ShowASType(i);
+							UpdateImportedResultList(null, nDataType, false);
+							break;
+						}
+					}
+				}
 			}
 		});
 		
 		Button btnHideAll = new Button("Unselect All");
+		btnHideAll.setId("btnUnselectAllASTypes_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnHideAll.setParent(layout);
 		btnHideAll.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
 			{
 				for(int i=0; i<13; i++)
-					m_resultFilterRule.HideASType(i);
-				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				{
+					Button btn = (Button)event.getTarget();
+					int nGridType = Integer.parseInt(btn.getId().split("_")[1]);
+					int nDataType = Integer.parseInt(btn.getId().split("_")[2]);
+					
+					switch(nGridType)
+					{
+						case GRID_TYPE_PERMANENT:
+						{
+							m_resultFilterRulePermanentList.HideASType(i);
+							UpdatePermanentResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_TEMPORARY:
+						{
+							m_resultFilterRuleTemporaryList.HideASType(i);
+							UpdateTemporaryResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_IMPORT:
+						{
+							m_resultFilterRuleImportedList.HideASType(i);
+							UpdateImportedResultList(null, nDataType, false);
+							break;
+						}
+					}
+				}
 			}
 		});
 		
@@ -278,6 +438,18 @@ public class ResultListHandler
 				Bandbox bandbox = (Bandbox)event.getTarget();
 				Bandpopup popup = (Bandpopup)bandbox.getFirstChild();
 				
+				
+				int nGridType = Integer.parseInt(bandbox.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(bandbox.getId().split("_")[2]);
+				
+				ResultFilterRule resultFilterRule = null;
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+					case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+					case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+				}
+				
 				for(Component c : popup.getChildren())
 				{
 					if(c instanceof Listbox)
@@ -287,101 +459,114 @@ public class ResultListHandler
 						for(Listitem item : listbox.getItems())
 						{					
 							if(item.isSelected())
-								m_resultFilterRule.ShowASType((int)item.getValue());
+								resultFilterRule.ShowASType((int)item.getValue());
 							else
-								m_resultFilterRule.HideASType((int)item.getValue());
+								resultFilterRule.HideASType((int)item.getValue());
 						}
 						
-						UpdatePermanentResultList(null);
-						UpdateTemporaryResultList(null);
+						switch(nGridType)
+						{
+							case GRID_TYPE_PERMANENT: UpdatePermanentResultList(null); break;
+							case GRID_TYPE_TEMPORARY: UpdateTemporaryResultList(null); break;
+							case GRID_TYPE_IMPORT:    UpdateImportedResultList(null, nDataType, false);  break;
+						}
+
 						return;
 					}
 				}
 			}
 		});
 		
+		ResultFilterRule resultFilterRule = null;
+		switch(nGridType)
+		{
+			case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+			case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+			case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+		}
+		
 		Listitem item = new Listitem("Exon skipping");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_EXON_SKIPPING);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_EXON_SKIPPING))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_EXON_SKIPPING))
 			item.setSelected(true);
 		
 		item = new Listitem("retained introns");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_RETAINED_INTRON);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_RETAINED_INTRON))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_RETAINED_INTRON))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. 5' exon end");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_5_PRIME_EXON_END))
 			item.setSelected(true);
 				
 		item = new Listitem("alt. 3' exon end");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_3_PRIME_EXON_END))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. start (unique junction; double)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN_DOUBLE))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. end (unique junction; double)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN_DOUBLE))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. start (shared junction; double)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN_DOUBLE);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN_DOUBLE))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN_DOUBLE))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. end (shared junction; double)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN_DOUBLE);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN_DOUBLE))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN_DOUBLE))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. start (unique junction)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_UNIQUE_JUN))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. end (unique junction)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_UNIQUE_JUN))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. start (shared junction)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_START_SHARED_JUN))
 			item.setSelected(true);
 		
 		item = new Listitem("alt. end (shared junction)");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN);
-		if(m_resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN))
+		if(resultFilterRule.IsShowingASType(SplicingWebApp.AS_TYPE_ALT_END_SHARED_JUN))
 			item.setSelected(true);
 	}
 
@@ -389,9 +574,10 @@ public class ResultListHandler
 	 *    Adds a menu for the result type filter to the corresponding
 	 *    column in the result table.
 	 */
-	private void AddResultTypeFilter(Column parent)
+	private void AddResultTypeFilter(Column parent, int nGridType, int nDataType, int nColIdx)
 	{		
 		Bandbox bandBox = new Bandbox();
+		bandBox.setId("bbResultTypeFilter_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		bandBox.setStyle("position: absolute; right: 0px; margin-right: 10px");
 		bandBox.setWidth("30px");
 		bandBox.setParent(parent);
@@ -404,30 +590,82 @@ public class ResultListHandler
 		layout.setParent(bandPopup);
 		
 		Button btnSelectAll = new Button("Select All");
+		btnSelectAll.setId("btnSelectAllResultTypes_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnSelectAll.setParent(layout);
 		btnSelectAll.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
-			{
+			{				
 				for(int i=0; i<4; i++)
-					m_resultFilterRule.ShowResultType(i);
-				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				{
+					Button btn = (Button)event.getTarget();
+					int nGridType = Integer.parseInt(btn.getId().split("_")[1]);
+					int nDataType = Integer.parseInt(btn.getId().split("_")[2]);
+					
+					switch(nGridType)
+					{
+						case GRID_TYPE_PERMANENT:
+						{
+							m_resultFilterRulePermanentList.ShowResultType(i);
+							UpdatePermanentResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_TEMPORARY:
+						{
+							m_resultFilterRuleTemporaryList.ShowResultType(i);
+							UpdateTemporaryResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_IMPORT:
+						{
+							m_resultFilterRuleImportedList.ShowResultType(i);
+							UpdateImportedResultList(null, nDataType, false);
+							break;
+						}
+					}
+				}
 			}
 		});
 		
 		Button btnHideAll = new Button("Unselect All");
 		btnHideAll.setParent(layout);
+		btnHideAll.setId("btnUnselectAllResultTypes_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnHideAll.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
 			{
 				for(int i=0; i<4; i++)
-					m_resultFilterRule.HideResultType(i);
-				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				{
+					Button btn = (Button)event.getTarget();
+					int nGridType = Integer.parseInt(btn.getId().split("_")[1]);
+					int nDataType = Integer.parseInt(btn.getId().split("_")[2]);
+					
+					switch(nGridType)
+					{
+						case GRID_TYPE_PERMANENT:
+						{
+							m_resultFilterRulePermanentList.HideResultType(i);
+							UpdatePermanentResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_TEMPORARY:
+						{
+							m_resultFilterRuleTemporaryList.HideResultType(i);
+							UpdateTemporaryResultList(null);
+							break;
+						}
+						
+						case GRID_TYPE_IMPORT:
+						{
+							m_resultFilterRuleImportedList.HideResultType(i);
+							UpdateImportedResultList(null, nDataType, false);
+							break;
+						}
+					}
+				}
 			}
 		});
 		
@@ -447,6 +685,17 @@ public class ResultListHandler
 				Bandbox bandbox = (Bandbox)event.getTarget();
 				Bandpopup popup = (Bandpopup)bandbox.getFirstChild();
 				
+				int nGridType = Integer.parseInt(bandbox.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(bandbox.getId().split("_")[2]);
+				
+				ResultFilterRule resultFilterRule = null;
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+					case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+					case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+				}
+				
 				for(Component c : popup.getChildren())
 				{
 					if(c instanceof Listbox)
@@ -456,38 +705,51 @@ public class ResultListHandler
 						for(Listitem item : listbox.getItems())
 						{					
 							if(item.isSelected())
-								m_resultFilterRule.ShowResultType((int)item.getValue());
+								resultFilterRule.ShowResultType((int)item.getValue());
 							else
-								m_resultFilterRule.HideResultType((int)item.getValue());
+								resultFilterRule.HideResultType((int)item.getValue());
 						}
 						
-						UpdatePermanentResultList(null);
-						UpdateTemporaryResultList(null);
+						switch(nGridType)
+						{
+							case GRID_TYPE_PERMANENT: UpdatePermanentResultList(null); break;
+							case GRID_TYPE_TEMPORARY: UpdateTemporaryResultList(null); break;
+							case GRID_TYPE_IMPORT:    UpdateImportedResultList(null, nDataType, false);  break;
+						}
+
 						return;
 					}
 				}
 			}
 		});
 		
+		ResultFilterRule resultFilterRule = null;
+		switch(nGridType)
+		{
+			case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+			case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+			case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+		}
+		
 		Listitem item = new Listitem("combined");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(AnalysisResult.RESULT_EVIDENCE_TYPE_COMBINED);
-		if(m_resultFilterRule.IsShowingResultType(AnalysisResult.RESULT_EVIDENCE_TYPE_COMBINED))
+		if(resultFilterRule.IsShowingResultType(AnalysisResult.RESULT_EVIDENCE_TYPE_COMBINED))
 			item.setSelected(true);
 		
 		item = new Listitem("ratio only");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(AnalysisResult.RESULT_EVIDENCE_TYPE_RATIO_ONLY);
-		if(m_resultFilterRule.IsShowingResultType(AnalysisResult.RESULT_EVIDENCE_TYPE_RATIO_ONLY))
+		if(resultFilterRule.IsShowingResultType(AnalysisResult.RESULT_EVIDENCE_TYPE_RATIO_ONLY))
 			item.setSelected(true);
 		
 		item = new Listitem("split read only");
 		item.setParent(listBox);
 		item.setCheckable(true);
 		item.setValue(AnalysisResult.RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY);
-		if(m_resultFilterRule.IsShowingResultType(AnalysisResult.RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY))
+		if(resultFilterRule.IsShowingResultType(AnalysisResult.RESULT_EVIDENCE_TYPE_SPLIT_READ_ONLY))
 			item.setSelected(true);
 	}
 
@@ -497,12 +759,21 @@ public class ResultListHandler
 	 *    requires a unique ID that is specified by the filter ID.
 	 *    See ResultFilterRule for valid filter IDs.
 	 */
-	private void AddStringFilter(Column parent, int nFilterID)
+	private void AddStringFilter(Column parent, int nFilterID, int nGridType, int nDataType, int nColIdx)
 	{
-		TreeSet<String> vcStrings = m_resultFilterRule.GetTextFilter(nFilterID).GetStrings();
+		ResultFilterRule resultFilterRule = null;
+		switch(nGridType)
+		{
+			case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+			case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+			case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+		}
+		
+		TreeSet<String> vcStrings = resultFilterRule.GetTextFilter(nFilterID).GetStrings();
 		
 		Bandbox bandBox = new Bandbox();
 		bandBox.setStyle("position: absolute; right: 0px; margin-right: 10px");
+		bandBox.setId("bbStringFilter_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		bandBox.setWidth("30px");
 		bandBox.setParent(parent);
 		bandBox.setValue(""+nFilterID);
@@ -515,6 +786,7 @@ public class ResultListHandler
 		layout.setParent(bandPopup);
 		
 		Button btnSelectAll = new Button("Select All");
+		btnSelectAll.setId("btnStringFilter_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnSelectAll.setParent(layout);
 		btnSelectAll.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
@@ -523,15 +795,39 @@ public class ResultListHandler
 				Bandbox bandbox = (Bandbox)event.getTarget().getParent().getParent().getParent();
 				int nFilterID = Integer.parseInt(bandbox.getValue());
 				
-				m_resultFilterRule.GetTextFilter(nFilterID).SelectAll();
+				Button btn = (Button)event.getTarget();
+				int nGridType = Integer.parseInt(btn.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(btn.getId().split("_")[2]);
 				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT:
+					{
+						m_resultFilterRulePermanentList.GetTextFilter(nFilterID).SelectAll();
+						UpdatePermanentResultList(null);
+						break;
+					}
+					
+					case GRID_TYPE_TEMPORARY:
+					{
+						m_resultFilterRuleTemporaryList.GetTextFilter(nFilterID).SelectAll();
+						UpdateTemporaryResultList(null);
+						break;
+					}
+					
+					case GRID_TYPE_IMPORT:
+					{
+						m_resultFilterRuleImportedList.GetTextFilter(nFilterID).SelectAll();
+						UpdateImportedResultList(null, nDataType, false);
+						break;
+					}
+				}
 			}
 		});
 		
 		Button btnHideAll = new Button("Unselect All");
 		btnHideAll.setParent(layout);
+		btnHideAll.setId("btnStringFilterUnselectAll_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnHideAll.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
@@ -539,10 +835,33 @@ public class ResultListHandler
 				Bandbox bandbox = (Bandbox)event.getTarget().getParent().getParent().getParent();
 				int nFilterID = Integer.parseInt(bandbox.getValue());
 				
-				m_resultFilterRule.GetTextFilter(nFilterID).UnselectAll();
+				Button btn = (Button)event.getTarget();
+				int nGridType = Integer.parseInt(btn.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(btn.getId().split("_")[2]);
 				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT:
+					{
+						m_resultFilterRulePermanentList.GetTextFilter(nFilterID).UnselectAll();
+						UpdatePermanentResultList(null);
+						break;
+					}
+					
+					case GRID_TYPE_TEMPORARY:
+					{
+						m_resultFilterRuleTemporaryList.GetTextFilter(nFilterID).UnselectAll();
+						UpdateTemporaryResultList(null);
+						break;
+					}
+					
+					case GRID_TYPE_IMPORT:
+					{
+						m_resultFilterRuleImportedList.GetTextFilter(nFilterID).UnselectAll();
+						UpdateImportedResultList(null, nDataType, false);
+						break;
+					}
+				}
 			}
 		});
 		
@@ -563,7 +882,17 @@ public class ResultListHandler
 				Bandpopup popup = (Bandpopup)bandbox.getFirstChild();
 				int nFilterID = Integer.parseInt(bandbox.getValue());
 				
-				m_resultFilterRule.GetTextFilter(nFilterID).SelectAll();
+				ResultFilterRule resultFilterRule = null;
+				int nGridType = Integer.parseInt(bandbox.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(bandbox.getId().split("_")[2]);
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+					case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+					case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+				}
+				
+				resultFilterRule.GetTextFilter(nFilterID).SelectAll();
 				
 				for(Component c : popup.getChildren())
 				{
@@ -574,13 +903,18 @@ public class ResultListHandler
 						for(Listitem item : listbox.getItems())
 						{
 							if(item.isSelected())
-								m_resultFilterRule.GetTextFilter(nFilterID).SelectString((String)item.getValue());
+								resultFilterRule.GetTextFilter(nFilterID).SelectString((String)item.getValue());
 							else
-								m_resultFilterRule.GetTextFilter(nFilterID).UnselectString((String)item.getValue());
+								resultFilterRule.GetTextFilter(nFilterID).UnselectString((String)item.getValue());
 						}
 						
-						UpdatePermanentResultList(null);
-						UpdateTemporaryResultList(null);
+						switch(nGridType)
+						{
+							case GRID_TYPE_PERMANENT: UpdatePermanentResultList(null); break;
+							case GRID_TYPE_TEMPORARY: UpdateTemporaryResultList(null); break;
+							case GRID_TYPE_IMPORT:    UpdateImportedResultList(null, nDataType, false); break;
+						}
+
 						return;
 					}
 				}
@@ -594,7 +928,7 @@ public class ResultListHandler
 			item.setCheckable(true);
 			item.setValue(strString);
 			
-			if(m_resultFilterRule.GetTextFilter(nFilterID).IsStringSelected(strString))
+			if(resultFilterRule.GetTextFilter(nFilterID).IsStringSelected(strString))
 				item.setSelected(true);
 		}
 	}
@@ -605,8 +939,16 @@ public class ResultListHandler
 	 *    requires a unique ID that is specified by the filter ID.
 	 *    See ResultFilterRule for valid filter IDs.
 	 */
-	private void AddNumberFilter(Component parent, int nFilterID)
+	private void AddNumberFilter(Component parent, int nFilterID, int nGridType, int nDataType, int nColIdx)
 	{
+		ResultFilterRule resultFilterRule = null;
+		switch(nGridType)
+		{
+			case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+			case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+			case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+		}
+		
 		Bandbox bandBox = new Bandbox();
 		bandBox.setStyle("position: absolute; right: 0px; margin-right: 10px");
 		bandBox.setWidth("30px");
@@ -635,9 +977,9 @@ public class ResultListHandler
 		Label labMinValue = new Label("min value: ");
 		labMinValue.setParent(layout);
 		
-		Textbox boxMinValue = new Textbox("" + m_resultFilterRule.GetNumberFilter(nFilterID).GetMinValue());
+		Textbox boxMinValue = new Textbox("" + resultFilterRule.GetNumberFilter(nFilterID).GetMinValue());
 		boxMinValue.setConstraint("/[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?/: Only numbers are allowed, including decimal numbers and scientific writing, e.g. 5.0E-3");
-		
+		boxMinValue.setId("tbNumberFilterMin_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		boxMinValue.setParent(layout);
 		boxMinValue.addEventListener(Events.ON_CHANGE, new EventListener<Event>()
 		{
@@ -648,21 +990,42 @@ public class ResultListHandler
 				int nFilterID = Integer.parseInt(bandbox.getValue());
 				
 				float fValue = Float.parseFloat(textbox.getText());
-				m_resultFilterRule.GetNumberFilter(nFilterID).SetMinValue(fValue);
 				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				int nGridType = Integer.parseInt(textbox.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(textbox.getId().split("_")[2]);
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT:
+					{
+						m_resultFilterRulePermanentList.GetNumberFilter(nFilterID).SetMinValue(fValue);
+						UpdatePermanentResultList(null);
+						break;
+					}
+					case GRID_TYPE_TEMPORARY:
+					{
+						m_resultFilterRuleTemporaryList.GetNumberFilter(nFilterID).SetMinValue(fValue);
+						UpdateTemporaryResultList(null);
+						break;
+					}
+					case GRID_TYPE_IMPORT:
+					{
+						m_resultFilterRuleImportedList.GetNumberFilter(nFilterID).SetMinValue(fValue);
+						UpdateImportedResultList(null, nDataType, false);
+						break;
+					}
+				}
 			}
 		});
 		
 		layout = new Hlayout();
 		layout.setParent(layoutV);
 		
-		labMinValue = new Label("max value: ");
-		labMinValue.setParent(layout);
+		Label labMaxValue = new Label("max value: ");
+		labMaxValue.setParent(layout);
 		
-		Textbox boxMaxValue = new Textbox("" + m_resultFilterRule.GetNumberFilter(nFilterID).GetMaxValue());
-		boxMinValue.setConstraint("/[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?/: Only numbers are allowed, including decimal numbers and scientific writing, e.g. 5.0E-3");
+		Textbox boxMaxValue = new Textbox("" + resultFilterRule.GetNumberFilter(nFilterID).GetMaxValue());
+		boxMaxValue.setConstraint("/[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?/: Only numbers are allowed, including decimal numbers and scientific writing, e.g. 5.0E-3");
+		boxMaxValue.setId("tbNumberFilterMax_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		boxMaxValue.setParent(layout);
 		boxMaxValue.addEventListener(Events.ON_CHANGE, new EventListener<Event>()
 		{
@@ -673,15 +1036,36 @@ public class ResultListHandler
 				int nFilterID = Integer.parseInt(bandbox.getValue());
 				
 				float fValue = Float.parseFloat(textbox.getText());
-				m_resultFilterRule.GetNumberFilter(nFilterID).SetMaxValue(fValue);
 				
-				UpdatePermanentResultList(null);
-				UpdateTemporaryResultList(null);
+				int nGridType = Integer.parseInt(textbox.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(textbox.getId().split("_")[2]);
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT:
+					{
+						m_resultFilterRulePermanentList.GetNumberFilter(nFilterID).SetMaxValue(fValue);
+						UpdatePermanentResultList(null);
+						break;
+					}
+					case GRID_TYPE_TEMPORARY:
+					{
+						m_resultFilterRuleTemporaryList.GetNumberFilter(nFilterID).SetMaxValue(fValue);
+						UpdateTemporaryResultList(null);
+						break;
+					}
+					case GRID_TYPE_IMPORT:
+					{
+						m_resultFilterRuleImportedList.GetNumberFilter(nFilterID).SetMaxValue(fValue);
+						UpdateImportedResultList(null, nDataType, false);
+						break;
+					}
+				}
 			}
 		});
 		
 		Button btnDisable = new Button("Disable filter");
 		btnDisable.setParent(layoutV);
+		btnDisable.setId("btnDisableFilter_" + nGridType + "_" + nDataType + "_" + nColIdx);
 		btnDisable.addEventListener(Events.ON_CLICK, new EventListener<Event>()
 		{
 			public void onEvent(Event event) throws Exception
@@ -689,9 +1073,30 @@ public class ResultListHandler
 				Bandbox bandbox = (Bandbox)event.getTarget().getParent().getParent().getParent();
 				int nFilterID = Integer.parseInt(bandbox.getValue());
 				
-				m_resultFilterRule.GetNumberFilter(nFilterID).Disable();
-				
-				UpdateTemporaryResultList(null);
+				Button btnTarget = (Button)event.getTarget();
+				int nGridType = Integer.parseInt(btnTarget.getId().split("_")[1]);
+				int nDataType = Integer.parseInt(btnTarget.getId().split("_")[2]);
+				switch(nGridType)
+				{
+					case GRID_TYPE_PERMANENT:
+					{
+						m_resultFilterRulePermanentList.GetNumberFilter(nFilterID).Disable();
+						UpdatePermanentResultList(null);
+						break;
+					}
+					case GRID_TYPE_TEMPORARY:
+					{
+						m_resultFilterRuleTemporaryList.GetNumberFilter(nFilterID).Disable();
+						UpdateTemporaryResultList(null);
+						break;
+					}
+					case GRID_TYPE_IMPORT:
+					{
+						m_resultFilterRuleImportedList.GetNumberFilter(nFilterID).Disable();
+						UpdateImportedResultList(null, nDataType, false);
+						break;
+					}
+				}
 			}
 		});
 	}
@@ -718,209 +1123,14 @@ public class ResultListHandler
 		DecimalFormat format = (DecimalFormat)nf;
 		format.applyPattern("0.####E0");
 		
-		if(bInit)
-		{
-			TreeSet<String> vcConditionsA = new TreeSet<String>();
-			TreeSet<String> vcConditionsB = new TreeSet<String>();
-
-			TreeSet<AnalysisResult> vcResults = m_resultHandler.GetAllResults();
-
-			for(AnalysisResult res : vcResults)
-			{
-				vcConditionsA.add(res.GetConditionA());
-				vcConditionsB.add(res.GetConditionB());
-			}
-			
-			TextFilter filter;
-			filter = new TextFilter(vcConditionsA);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_A, filter);
-			filter = new TextFilter(vcConditionsB);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_B, filter);
-			
-			TreeSet<String> vcStrings = new TreeSet<String>();
-			vcStrings.add("true");
-			vcStrings.add("false");
-			vcStrings.add("NA");
-			filter = new TextFilter(vcStrings);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI, filter);
-			filter = new TextFilter(vcStrings);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION, filter);
-			
-		}
-		
 		m_gridHitList.setMold("default");
 		
 		// clear old rows
 		m_gridHitList.getChildren().clear();
 		m_gridHitList.setMold("paging");
 		m_gridHitList.setPageSize(10);
-	
-		//##################################
-		//           add header
-		//##################################
-		Columns cols = new Columns();
 		
-		// image for result removal
-		Column col = new Column("");
-		col.setWidth("30px");
-		col.setParent(cols);
-	
-		// view result
-		col = new Column("");
-		col.setWidth("40px");
-		col.setParent(cols);
-		
-		// detailed view
-		col = new Column("");
-		col.setWidth("40px");
-		col.setParent(cols);
-		
-		// detailed description
-		col = new Column("");
-		col.setWidth("40px");
-		col.setParent(cols);
-		
-		col = new Column("Rating");
-		col.setAlign("center");
-		col.setSortAscending(getAscRatingComparator());
-		col.setSortDescending(getDescRatingComparator());
-		col.setWidth("110px");
-		col.setParent(cols);
-	
-		col = new Column("Gene ID");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("140px");
-		col.setParent(cols);
-		
-		col = new Column("Gene Symbol");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("100px");
-		col.setParent(cols);
-		
-		col = new Column("Condition A");
-		col.setAlign("center");
-		col.setWidth("160px");
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_CONDITION_A);
-		
-		col = new Column("Condition B");
-		col.setAlign("center");
-		col.setWidth("160px");
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_CONDITION_B);
-				
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("170px");
-		col.setParent(cols);
-		Label lab = new Label("AS Type");
-		lab.setParent(col);
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		AddSplicingTypeFilter(col);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setWidth("120px");
-		col.setAlign("center");
-		col.setParent(cols);
-		lab = new Label("Result Type");
-		lab.setParent(col);
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		AddResultTypeFilter(col);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("ratio change (exon A)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("ratio change (exon B)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_B);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("150px");
-		col.setParent(cols);
-		lab = new Label("PSI change");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_PSI_CHANGE);
-		
-		col = new Column("");
-		col.setSortAscending(getAscNumberComparator(14));
-		col.setSortDescending(getDescNumberComparator(14));
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("p-value ratio (exon A)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A);
-		
-		col = new Column("");
-		col.setSortAscending(getAscNumberComparator(15));
-		col.setSortDescending(getDescNumberComparator(15));
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("p-value ratio (exon B)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_B);
-		
-		Column colPSI = new Column("");
-		colPSI.setSortAscending(getAscNumberComparator(16));
-		colPSI.setSortDescending(getDescNumberComparator(16));
-		colPSI.setAlign("right");
-		colPSI.setWidth("150px");
-		colPSI.setParent(cols);
-		lab = new Label("p-value PSI");
-		lab.setParent(colPSI);
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		AddNumberFilter(colPSI, ResultFilterRule.FILTER_TYPE_P_VALUE_PSI);
-		
-		col = new Column("significant");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("150px");
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI);
-		
-		col = new Column("novel junction");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("170px");		
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION);
-		
-		col = new Column("event Location");
-		col.setSort("auto");
-		col.setAlign("left");
-		col.setWidth("200px");
-		col.setParent(cols);
-		
-		col = new Column("Comment");
-		col.setWidth("410px");
-		col.setAlign("left");
-		col.setParent(cols);
-	
-		cols.setParent(m_gridHitList);
+		Column colPSI = AddColumnHeadersToGridForManananggalResults(m_gridHitList, GRID_TYPE_PERMANENT, 0, bInit);
 		
 		Rows rows = new Rows();
 		rows.setParent(m_gridHitList);
@@ -932,7 +1142,7 @@ public class ResultListHandler
 		
 		for(AnalysisResult res : vcResults)
 		{
-			if(!m_resultFilterRule.bIsValidResult(res))
+			if(!m_resultFilterRulePermanentList.bIsValidResult(res))
 				continue;
 			
 			Row row = new Row();
@@ -940,304 +1150,87 @@ public class ResultListHandler
 			row.setValue(res.GetRating());
 			row.setParent(rows);
 			
-			String strImageString = "/img/red_cross.png";
-			Image img = new Image(strImageString);
-			img.setHeight("18px");
-			img.setParent(row);
-			img.setId("remove_" + res.GetID());
-			img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:pointer;");
+			AddCellToRow(row, "", "remove_", "30px", "float: center", res, 1);
+			AddCellToRow(row, "", "view_", "40px", "float: center", res, 2);
+			AddCellToRow(row, "", "detailView_", "40px", "float: center", res, 3);
+			AddCellToRow(row, "", "details_", "40px", "float: center", res, 4);
+			AddCellToRow(row, "", "rating_", "110px", "float: center", res, 5);
 			
-			img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-			{
-				public void onEvent(Event event) throws Exception
-				{
-					Image img = (Image)event.getTarget();
-
-					int nID = Integer.parseInt(img.getId().split("_")[1]);
-					
-					m_resultHandler.RemoveResult(nID);
-					UpdatePermanentResultList(null);
-				}
-			});
-			
-			if(res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
-			{
-				Label label = new Label("");			
-				label.setParent(row);
-			}
-			else
-			{
-				strImageString = "/img/view.png";
-				
-				if(res.UsesNovelJunction())
-					strImageString = "/img/view_incomplete.png";
-				
-				img = new Image(strImageString);
-				img.setHeight("12px");
-				img.setParent(row);
-				img.setId("view_" + res.GetID());
-				img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:pointer;");
-				
-				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-				{
-					public void onEvent(Event event) throws Exception
-					{
-						Image img = (Image)event.getTarget();
-	
-						int nID = Integer.parseInt(img.getId().split("_")[1]);
-						
-						AnalysisResult res = m_resultHandler.GetResult(nID);
-						m_App.PrepareHitForVisualization(res);
-						m_App.m_plotFactory.RequestCoverageRedraw();
-						m_App.m_plotFactory.DrawPlots();
-					}
-				});
-			}
-			
-			if(res.HasPSIScore() || res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
-			{
-				strImageString = "/img/magnifier_blue.png";
-				
-				if(res.UsesNovelJunction())
-					strImageString = "/img/magnifier_red.png";
-				
-				img = new Image(strImageString);
-				img.setHeight("20px");
-				img.setParent(row);
-				img.setId("detailView_" + res.GetID());
-				img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:pointer;");
-				
-				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-				{
-					public void onEvent(Event event) throws Exception
-					{
-						Image img = (Image)event.getTarget();
-	
-						int nID = Integer.parseInt(img.getId().split("_")[1]);
-						
-						AnalysisResult res = m_resultHandler.GetResult(nID);
-						m_App.PrepareHitForVisualization(res);
-						
-						if(res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
-						{
-							m_App.m_plotFactory.DrawRetainedIntronCloseup(res);
-						}
-						else
-						{
-							m_App.m_plotFactory.DrawSpliceJunctionCloseup(res);
-						}
-					}
-				});
-			}
-			else
-			{
-				Label label = new Label("");			
-				label.setParent(row);
-			}
-			
-			strImageString = "/img/detailed_desc.png";
-			img = new Image(strImageString);
-			img.setWidth("16px");
-			img.setHeight("20px");
-			img.setParent(row);
-			img.setId("details_" + res.GetID());
-			img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:hand; cursor:pointer;");
-			
-			img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-			{
-				public void onEvent(Event event) throws Exception
-				{
-					Image img = (Image)event.getTarget();
-
-					int nID = Integer.parseInt(img.getId().split("_")[1]);
-					AnalysisResult res = m_resultHandler.GetResult(nID);
-					m_App.PrepareHitForVisualization(res);
-					ShowDetailPopup(res);
-				}
-			});
-			
-			Hlayout layoutH = new Hlayout();
-			layoutH.setParent(row);
-			for(int i=0; i<5; i++)
-			{
-				img = null;
-				
-				if(i<res.GetRating())
-				{
-					img = new Image("/img/good_rating.png");
-				}
-				else
-				{
-					img = new Image("/img/neutral_rating.png");
-				}
-				
-				img.setHeight("15px");
-				img.setParent(layoutH);
-				img.setId("rating_" + (i+1) + "_" + res.GetID());
-				img.setStyle("cursor:hand; cursor:pointer;");
-				
-				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-				{
-					public void onEvent(Event event) throws Exception
-					{
-						Image img = (Image)event.getTarget();
-						
-						String strID = img.getId();
-						
-						String pSplit[] = strID.split("_");
-						int nNewRating = Integer.parseInt(pSplit[1]);
-						int nID = Integer.parseInt(pSplit[2]);
-						
-						AnalysisResult res = m_resultHandler.GetResult(nID);
-						int nOldRating = res.GetRating();
-						
-						// remove rating if the same star was clicked again.
-						if(nNewRating == nOldRating)
-							nNewRating = 0;
-						
-						int i=0;
-						for(Component c : img.getParent().getChildren())
-						{
-							Image imgRating = (Image) c;
-							imgRating.invalidate();
-							
-							if(i < nNewRating)
-							{
-								imgRating.setSrc("/img/good_rating.png");
-							}
-							else
-							{
-								imgRating.setSrc("/img/neutral_rating.png");
-							}							
-							i++;
-						}
-	
-						res.SetRating(nNewRating);
-						Row row = (Row)img.getParent().getParent();
-						row.setValue(nNewRating);
-					}
-				});
-			}
-			
-			Label label = new Label(res.GetGeneID());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetGeneSymbol());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetConditionA());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetConditionB());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetTypeAsString());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetResultTypeAsString());
-			label.setStyle("float: center");
-			label.setParent(row);
+			AddCellToRow(row, res.GetGeneID(),             "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionA(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionB(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetASTypeAsString(),       "", "170px", "float: center", res, 0);
+			AddCellToRow(row, res.GetResultTypeAsString(), "", "120px", "float: center", res, 0);
 			
 			if(res.HasAltExonA())
 			{
-				label = new Label(String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeA()*100));
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeA()*100);
 				if(Math.abs(res.GetAbsoluteChangeA()) < 0.05)
-					label.setStyle("color: red");
-				label.setStyle("float: right");
-				label.setParent(row);
+					AddCellToRow(row, strText, "", "210px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "210px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 			
 			if(res.HasAltExonB())
 			{
-				label = new Label(String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeB()*100));
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeB()*100);
 				if(Math.abs(res.GetAbsoluteChangeB()) < 0.05)
-					label.setStyle("color: red");
-				label.setStyle("float: right");
-				label.setParent(row);
+					AddCellToRow(row, strText, "", "210px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "210px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 			
 			if(res.HasPSIScore())
 			{
-				label = new Label(String.format(Locale.ENGLISH, "%.2f%%", res.GetInclusionChange()*100));
-				if(res.GetInclusionChange() < 0.05)
-					label.setStyle("color: red");
-				label.setStyle("float: right");
-				label.setParent(row);
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetInclusionChange()*100);
+				if(Math.abs(res.GetInclusionChange()) < 0.05)
+					AddCellToRow(row, strText, "", "150px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "150px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "150px", "float: right", res, 0);
 			}
 			
 			if(res.HasAltExonA())
 			{
-				label = new Label(format.format(res.GetPValueA()));
-				label.setStyle("float: right");
-				label.setParent(row);				
+				AddCellToRow(row, format.format(res.GetPValueA()), "", "210px", "float: right", res, 0);	
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 	
 			if(res.HasAltExonB())
 			{
-				label = new Label(format.format(res.GetPValueB()));
-				label.setStyle("float: right");
-				label.setParent(row);				
+				AddCellToRow(row, format.format(res.GetPValueB()), "", "210px", "float: right", res, 0);	
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);				
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 	
 			if(res.HasPSIScore())
 			{
-				label = new Label(format.format(res.GetPValuePSI()));
-				label.setStyle("float: right");
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "%s", res.HasSignificantPSIScore()));
-				label.setStyle("align: center");
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "%s", res.UsesNovelJunction()));
-				label.setStyle("align: center");
-				label.setParent(row);
+				AddCellToRow(row, format.format(res.GetPValuePSI()), "", "150px", "float: right", res, 0);
+				AddCellToRow(row, String.format(Locale.ENGLISH, "%s", res.HasSignificantPSIScore()), "", "150px", "float: right", res, 0);
+				AddCellToRow(row, String.format(Locale.ENGLISH, "%s", res.UsesNovelJunction()), "", "170px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "150px", "float: right", res, 0);
+				AddCellToRow(row, "NA", "", "150px", "float: center", res, 0);			
+				AddCellToRow(row, "NA", "", "170px", "float: center", res, 0);
 			}
 			
 			int nEventStart = Integer.MAX_VALUE;
@@ -1260,17 +1253,14 @@ public class ResultListHandler
 				nEventStart = Math.min(res.GetExclusionJunctionStart(), nEventStart);
 				nEventEnd 	= Math.max(res.GetExclusionJunctionEnd(),   nEventEnd);
 			}
-			
-			label = new Label(String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd));
-			label.setStyle("float: left");
-			label.setParent(row);
-			
-			label = new Label(res.GetComment());
-			label.setStyle("float: left");
-			label.setParent(row);
+
+			AddCellToRow(row, String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd), "", "200px", "float: left", res, 0);
+			AddCellToRow(row, res.GetComment(), "commentField_", "400px", "float: left", res, 6);
 		}
-		
+
 		colPSI.sort(true);
+		
+		m_Tabs.invalidate();
 	}
 	
 	/**
@@ -1716,208 +1706,14 @@ public class ResultListHandler
 		m_resultHandler.ClearTemporaryResults();
 		m_resultHandler.UpdateTemporaryResults();
 		
-		if(bInit)
-		{
-			TreeSet<String> vcConditionsA = new TreeSet<String>();
-			TreeSet<String> vcConditionsB = new TreeSet<String>();
-
-			TreeSet<AnalysisResult> vcResults = m_resultHandler.GetAllTemporaryResults();
-
-			for(AnalysisResult res : vcResults)
-			{
-				vcConditionsA.add(res.GetConditionA());
-				vcConditionsB.add(res.GetConditionB());
-			}
-			
-			TextFilter filter;
-			filter = new TextFilter(vcConditionsA);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_A, filter);
-			filter = new TextFilter(vcConditionsB);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_B, filter);
-			
-			TreeSet<String> vcStrings = new TreeSet<String>();
-			vcStrings.add("true");
-			vcStrings.add("false");
-			vcStrings.add("NA");
-			filter = new TextFilter(vcStrings);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI, filter);
-			filter = new TextFilter(vcStrings);
-			m_resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION, filter);
-			
-		}
-		
 		m_gridTmpHitList.setMold("default");
 		
 		// clear old rows
 		m_gridTmpHitList.getChildren().clear();
 		m_gridTmpHitList.setMold("paging");
 		m_gridTmpHitList.setPageSize(10);
-	
-		//##################################
-		//           add header
-		//##################################
-		Columns cols = new Columns();
-	//	cols.setMenupopup("auto");
 		
-		// combobox for saving
-		Column col = new Column("");
-		col.setWidth("30px");
-		col.setParent(cols);
-	
-		// view result
-		col = new Column("");
-		col.setWidth("40px");
-		col.setParent(cols);
-		
-		// detailed view
-		col = new Column("");
-		col.setWidth("40px");
-		col.setParent(cols);
-		
-		// detailed description
-		col = new Column("");
-		col.setWidth("40px");
-		col.setParent(cols);
-		
-		col = new Column("Rating");
-		col.setAlign("center");
-		col.setSortAscending(getAscRatingComparator());
-		col.setSortDescending(getDescRatingComparator());
-		col.setWidth("110px");
-		col.setParent(cols);
-	
-		col = new Column("Gene ID");
-		col.setAlign("center");
-		col.setWidth("140px");
-		col.setParent(cols);
-		
-		col = new Column("Gene Symbol");
-		col.setAlign("center");
-		col.setWidth("100px");
-		col.setParent(cols);
-		
-		col = new Column("Condition A");
-		col.setAlign("center");
-		col.setWidth("160px");
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_CONDITION_A);
-		
-		col = new Column("Condition B");
-		col.setAlign("center");
-		col.setWidth("160px");
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_CONDITION_B);
-				
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("170px");
-		col.setParent(cols);
-		Label lab = new Label("AS Type");
-		lab.setParent(col);
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		AddSplicingTypeFilter(col);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setWidth("120px");
-		col.setAlign("center");
-		col.setParent(cols);
-		lab = new Label("Result Type");
-		lab.setParent(col);
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		AddResultTypeFilter(col);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("ratio change (exon A)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("ratio change (exon B)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_B);
-		
-		col = new Column("");
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("150px");
-		col.setParent(cols);
-		lab = new Label("PSI change");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_PSI_CHANGE);
-		
-		col = new Column("");
-		col.setSortAscending(getAscNumberComparator(14));
-		col.setSortDescending(getDescNumberComparator(14));
-		col.setSort("auto");
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("p-value ratio (exon A)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A);
-		
-		col = new Column("");
-		col.setSortAscending(getAscNumberComparator(15));
-		col.setSortDescending(getDescNumberComparator(15));
-		col.setAlign("right");
-		col.setWidth("210px");
-		col.setParent(cols);
-		lab = new Label("p-value ratio (exon B)");
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		lab.setParent(col);
-		AddNumberFilter(col, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_B);
-		
-		Column colPSI = new Column("");
-		colPSI.setSortAscending(getAscNumberComparator(16));
-		colPSI.setSortDescending(getDescNumberComparator(16));
-		colPSI.setAlign("right");
-		colPSI.setWidth("150px");
-		colPSI.setParent(cols);
-		lab = new Label("p-value PSI");
-		lab.setParent(colPSI);
-		lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
-		AddNumberFilter(colPSI, ResultFilterRule.FILTER_TYPE_P_VALUE_PSI);
-		
-		col = new Column("significant");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("150px");
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI);
-		
-		col = new Column("novel junction");
-		col.setSort("auto");
-		col.setAlign("center");
-		col.setWidth("170px");		
-		col.setParent(cols);
-		AddStringFilter(col, ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION);
-		
-		col = new Column("event Location");
-		col.setSort("auto");
-		col.setAlign("left");
-		col.setWidth("200px");
-		col.setParent(cols);
-		
-		col = new Column("Comment");
-		col.setWidth("410px");
-		col.setAlign("left");
-		col.setParent(cols);
-	
-		cols.setParent(m_gridTmpHitList);
+		Column colPSI = AddColumnHeadersToGridForManananggalResults(m_gridTmpHitList, GRID_TYPE_TEMPORARY, 0, bInit);
 		
 		Rows rows = new Rows();
 		rows.setParent(m_gridTmpHitList);
@@ -1929,7 +1725,7 @@ public class ResultListHandler
 		
 		for(AnalysisResult res : vcResults)
 		{
-			if(!m_resultFilterRule.bIsValidResult(res))
+			if(!m_resultFilterRuleTemporaryList.bIsValidResult(res))
 				continue;
 			
 			Row row = new Row();
@@ -1937,291 +1733,87 @@ public class ResultListHandler
 			row.setValue(res.GetRating());
 			row.setParent(rows);
 			
-			Checkbox checkbox = new Checkbox();
-			checkbox.setValue(res.GetID());
-			checkbox.setHeight("20px");
-			checkbox.setWidth("20px");
-			checkbox.setParent(row);
+			AddCellToRow(row, "", "", "40px", "float: center", res, 7);
+			AddCellToRow(row, "", "TMPview_", "40px", "float: center", res, 2);
+			AddCellToRow(row, "", "TMPdetailView_", "40px", "float: center", res, 3);
+			AddCellToRow(row, "", "TMPdetails_", "40px", "float: center", res, 4);
+			AddCellToRow(row, "", "TMPrating_", "110px", "float: center", res, 5);
 			
-			if(res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
-			{
-				Label label = new Label("");			
-				label.setParent(row);
-			}
-			else
-			{
-				String strImageString = "/img/view.png";
-				
-				if(res.UsesNovelJunction())
-					strImageString = "/img/view_incomplete.png";
-				
-				Image img = new Image(strImageString);
-				img.setHeight("12px");
-				img.setParent(row);
-				img.setId("TMPview_" + res.GetID());
-				img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:hand; cursor:pointer;");
-				
-				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-				{
-					public void onEvent(Event event) throws Exception
-					{
-						Image img = (Image)event.getTarget();
-	
-						int nID = Integer.parseInt(img.getId().split("_")[1]);
-						AnalysisResult res = m_resultHandler.GetTemporaryResult(nID);
-						m_App.PrepareHitForVisualization(res);
-						m_App.m_plotFactory.RequestCoverageRedraw();
-						m_App.m_plotFactory.DrawPlots();					
-					}
-				});
-			}
-			
-			if(res.HasPSIScore() || res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
-			{
-				String strImageString = "/img/magnifier_blue.png";
-				
-				if(res.UsesNovelJunction())
-					strImageString = "/img/magnifier_red.png";
-				
-				Image img = new Image(strImageString);
-				img.setHeight("20px");
-				img.setParent(row);
-				img.setId("TMPdetailView_" + res.GetID());
-				img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:hand; cursor:pointer;");
-				
-				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-				{
-					public void onEvent(Event event) throws Exception
-					{
-						Image img = (Image)event.getTarget();
-	
-						int nID = Integer.parseInt(img.getId().split("_")[1]);
-						
-						AnalysisResult res = null;
-						res = m_resultHandler.GetTemporaryResult(nID);
-						m_App.PrepareHitForVisualization(res);
-						
-						if(res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
-						{
-							m_App.m_plotFactory.DrawRetainedIntronCloseup(res);
-						}
-						else
-						{
-							m_App.m_plotFactory.DrawSpliceJunctionCloseup(res);
-						}
-					}
-				});
-			}
-			else
-			{
-				Label label = new Label("");			
-				label.setParent(row);
-			}
-			
-			String strImageString = "/img/detailed_desc.png";
-
-			Image img = new Image(strImageString);
-			img.setWidth("16px");
-			img.setHeight("20px");
-			img.setParent(row);
-			img.setId("TMPdetails_" + res.GetID());
-			img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:hand; cursor:pointer;");
-			
-			img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-			{
-				public void onEvent(Event event) throws Exception
-				{
-					Image img = (Image)event.getTarget();
-
-					int nID = Integer.parseInt(img.getId().split("_")[1]);
-					AnalysisResult res = m_resultHandler.GetTemporaryResult(nID);
-					m_App.PrepareHitForVisualization(res);
-					ShowDetailPopup(res);
-				}
-			});
-			
-			Hlayout layoutH = new Hlayout();
-			layoutH.setParent(row);
-			for(int i=0; i<5; i++)
-			{
-				img = null;
-				
-				if(i<res.GetRating())
-				{
-					img = new Image("/img/good_rating.png");
-				}
-				else
-				{
-					img = new Image("/img/neutral_rating.png");
-				}
-				
-				img.setHeight("15px");
-				img.setParent(layoutH);
-				img.setId("TMPrating_" + (i+1) + "_" + res.GetID());
-				img.setStyle("cursor:hand; cursor:pointer;");
-				
-				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
-				{
-					public void onEvent(Event event) throws Exception
-					{
-						Image img = (Image)event.getTarget();
-						
-						String strID = img.getId();
-						
-						String pSplit[] = strID.split("_");
-						int nNewRating = Integer.parseInt(pSplit[1]);
-						int nID = Integer.parseInt(pSplit[2]);
-						
-						AnalysisResult res = m_resultHandler.GetTemporaryResult(nID);
-						int nOldRating = res.GetRating();
-						
-						// remove rating if the same star was clicked again.
-						if(nNewRating == nOldRating)
-							nNewRating = 0;
-						
-						int i=0;
-						for(Component c : img.getParent().getChildren())
-						{
-							Image imgRating = (Image) c;
-							imgRating.invalidate();
-							
-							if(i < nNewRating)
-							{
-								imgRating.setSrc("/img/good_rating.png");
-							}
-							else
-							{
-								imgRating.setSrc("/img/neutral_rating.png");
-							}							
-							i++;
-						}
-	
-						res.SetRating(nNewRating);
-						Row row = (Row)img.getParent().getParent();
-						row.setValue(nNewRating);
-					}
-				});
-			}
-			
-			Label label = new Label(res.GetGeneID());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetGeneSymbol());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetConditionA());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetConditionB());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetTypeAsString());
-			label.setStyle("float: center");
-			label.setParent(row);
-			
-			label = new Label(res.GetResultTypeAsString());
-			label.setStyle("float: center");
-			label.setParent(row);
+			AddCellToRow(row, res.GetGeneID(),             "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionA(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionB(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetASTypeAsString(),       "", "170px", "float: center", res, 0);
+			AddCellToRow(row, res.GetResultTypeAsString(), "", "120px", "float: center", res, 0);
 			
 			if(res.HasAltExonA())
 			{
-				label = new Label(String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeA()*100));
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeA()*100);
 				if(Math.abs(res.GetAbsoluteChangeA()) < 0.05)
-					label.setStyle("color: red");
-				label.setStyle("float: right");
-				label.setParent(row);
+					AddCellToRow(row, strText, "", "210px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "210px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 			
 			if(res.HasAltExonB())
 			{
-				label = new Label(String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeB()*100));
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeB()*100);
 				if(Math.abs(res.GetAbsoluteChangeB()) < 0.05)
-					label.setStyle("color: red");
-				label.setStyle("float: right");
-				label.setParent(row);
+					AddCellToRow(row, strText, "", "210px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "210px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 			
 			if(res.HasPSIScore())
 			{
-				label = new Label(String.format(Locale.ENGLISH, "%.2f%%", res.GetInclusionChange()*100));
-				if(res.GetInclusionChange() < 0.05)
-					label.setStyle("color: red");
-				label.setStyle("float: right");
-				label.setParent(row);
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetInclusionChange()*100);
+				if(Math.abs(res.GetInclusionChange()) < 0.05)
+					AddCellToRow(row, strText, "", "150px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "150px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "150px", "float: right", res, 0);
 			}
 			
 			if(res.HasAltExonA())
 			{
-				label = new Label(format.format(res.GetPValueA()));
-				label.setStyle("float: right");
-				label.setParent(row);				
+				AddCellToRow(row, format.format(res.GetPValueA()), "", "210px", "float: right", res, 0);	
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 	
 			if(res.HasAltExonB())
 			{
-				label = new Label(format.format(res.GetPValueB()));
-				label.setStyle("float: right");
-				label.setParent(row);				
+				AddCellToRow(row, format.format(res.GetPValueB()), "", "210px", "float: right", res, 0);	
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setStyle("float: right");
-				label.setParent(row);				
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
 			}
 	
 			if(res.HasPSIScore())
 			{
-				label = new Label(format.format(res.GetPValuePSI()));
-				label.setStyle("float: right");
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "%s", res.HasSignificantPSIScore()));
-				label.setStyle("align: center");
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "%s", res.UsesNovelJunction()));
-				label.setStyle("align: center");
-				label.setParent(row);
+				AddCellToRow(row, format.format(res.GetPValuePSI()), "", "150px", "float: right", res, 0);
+				AddCellToRow(row, String.format(Locale.ENGLISH, "%s", res.HasSignificantPSIScore()), "", "150px", "float: right", res, 0);
+				AddCellToRow(row, String.format(Locale.ENGLISH, "%s", res.UsesNovelJunction()), "", "170px", "float: right", res, 0);
 			}
 			else
 			{
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setParent(row);
-				
-				label = new Label(String.format(Locale.ENGLISH, "NA"));
-				label.setParent(row);
+				AddCellToRow(row, "NA", "", "150px", "float: right", res, 0);
+				AddCellToRow(row, "NA", "", "150px", "float: center", res, 0);			
+				AddCellToRow(row, "NA", "", "170px", "float: center", res, 0);
 			}
 			
 			int nEventStart = Integer.MAX_VALUE;
@@ -2244,41 +1836,99 @@ public class ResultListHandler
 				nEventStart = Math.min(res.GetExclusionJunctionStart(), nEventStart);
 				nEventEnd 	= Math.max(res.GetExclusionJunctionEnd(),   nEventEnd);
 			}
-			
-			label = new Label(String.format(Locale.ENGLISH, "%s:%,d - %,d", m_App.m_dataSupplier.GetReferenceName(), nEventStart, nEventEnd));
-			label.setStyle("float: left");
-			label.setParent(row);
-			
-			Textbox boxComment = new Textbox();
-			boxComment.setParent(row);
-			boxComment.setInplace(true);
-			boxComment.setWidth("99%");
-			boxComment.setStyle("margin-top: -5px; margin-bottom: -5px;");
-			boxComment.setHflex("1");
-			boxComment.setId("tmpCommentField_" + res.GetID());
-			boxComment.setText(res.GetComment());
-			boxComment.setTooltiptext(res.GetComment());
-			
-			boxComment.addEventListener(Events.ON_CHANGE, new EventListener<Event>()
-			{
-				public void onEvent(Event event) throws Exception
-				{
-					Textbox box = (Textbox)event.getTarget();
-					
-					String strID = box.getId();
-					
-					String pSplit[] = strID.split("_");
-					int nID = Integer.parseInt(pSplit[1]);
-					
-					AnalysisResult res = m_resultHandler.GetTemporaryResult(nID);
-					res.SetComment(box.getText());
-				}
-			});
+
+			AddCellToRow(row, String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd), "", "200px", "float: left", res, 0);
+			AddCellToRow(row, res.GetComment(), "TMPCommentField_", "400px", "float: left", res, 6);
 		}
-		
+
 		colPSI.sort(true);
+		
+		m_Tabs.invalidate();
 	}
 
+	/**
+	 *    Updates the contents of the imported result list.
+	 */
+	public void UpdateImportedResultList(Vector<AnalysisResult> vcResults, int nDataType, boolean bInit) throws ClassNotFoundException, InstantiationException, IllegalAccessException
+	{
+		if(bInit)
+		{
+			m_vcImportedResults.clear();
+			m_vcImportedResults = vcResults;
+		}
+		
+		// clear old rows
+		m_gridImportedResults.setMold("default");
+		m_gridImportedResults.getChildren().clear();
+		m_gridImportedResults.setMold("paging");
+		m_gridImportedResults.setPageSize(10);
+		
+		// reset filter rules on data initialization
+		if(bInit) ModifyFilterValuesForImportedData();
+		
+		// prepare new rows
+		Rows rows = new Rows();
+		rows.setParent(m_gridImportedResults);
+		
+		Column colPSI = null;
+		switch(nDataType)
+		{
+			case SplicingWebApp.IMPORTED_DATA_TYPE_MANA:
+			{
+				// add columns
+				colPSI = AddColumnHeadersToGridForImportedManananggalResults(m_gridImportedResults, GRID_TYPE_IMPORT, nDataType);
+				// add rows
+				AddImportedManananggalDataToGrid(rows);
+				break;
+			}
+				
+			case SplicingWebApp.IMPORTED_DATA_TYPE_DEXSEQ:
+			{
+				// add columns
+				colPSI = AddColumnHeadersToGridForImportedDEXSeqResults(m_gridImportedResults, GRID_TYPE_IMPORT, nDataType);
+				// add rows
+				AddImportedDEXSeqDataToGrid(rows);
+				break;
+			}
+			
+			case SplicingWebApp.IMPORTED_DATA_TYPE_RMATS:
+			{
+				// add columns
+				colPSI = AddColumnHeadersToGridForImportedRMATSResults(m_gridImportedResults, GRID_TYPE_IMPORT, nDataType);
+				// add rows
+				AddImportedRMATSDataToGrid(rows);
+				break;
+			}
+			
+			case SplicingWebApp.IMPORTED_DATA_TYPE_JSPLICE:
+			{
+				// add columns
+				colPSI = AddColumnHeadersToGridForImportedJSpliceResults(m_gridImportedResults, GRID_TYPE_IMPORT, nDataType);
+				// add rows
+				AddImportedJSpliceDataToGrid(rows);
+				break;
+			}
+			
+			case SplicingWebApp.IMPORTED_DATA_TYPE_CUFFDIFF:
+			{
+				// add columns
+				colPSI = AddColumnHeadersToGridForImportedCuffdiffResults(m_gridImportedResults, GRID_TYPE_IMPORT, nDataType);
+				// add rows
+				AddImportedCuffdiffDataToGrid(rows);
+				break;
+			}
+			
+			default:
+			{
+				ErrorMessage.ShowError("Unknown file type of imported file");
+				return;
+			}
+		}
+
+		colPSI.sort(true);
+		m_Tabs.invalidate();
+	}
+	
 	/** Helper function used to sort rows by ascending user ratings. */
 	private Comparator<Row> getAscRatingComparator()
 	{
@@ -2322,28 +1972,28 @@ public class ResultListHandler
 	}
 
 	/**
-	 *    Helper function used to sort the rows in descending order
+	 *    Helper function used to sort number containing columns in descending order
 	 *    by the value specified in the column nIdx.
 	 */
-	private Comparator<Row> getDescNumberComparator(int nIdx)
+	private Comparator<Row> getDescNumberComparator(int nColIdx)
 	{	
-		final int m_nIdx = nIdx;
+		final int m_nIdx = nColIdx;
 		
 		return new Comparator<Row>()
 		{
 			@Override
 			public int compare(Row arg0, Row arg1)
 			{
-				Label lab1 = (Label)arg0.getChildren().get(m_nIdx);
-				Label lab2 = (Label)arg1.getChildren().get(m_nIdx);
+				Label lab1 = (Label)arg0.getChildren().get(m_nIdx).getChildren().get(0);
+				Label lab2 = (Label)arg1.getChildren().get(m_nIdx).getChildren().get(0);
 				
 				String strValue1 = lab1.getValue();
 				String strValue2 = lab2.getValue();
 				
 				if(!strValue1.equals("NA") && !strValue2.equals("NA"))
 				{
-					double fValue1 = Double.parseDouble(strValue1);//new BigDecimal(strValue1).longValueExact();
-					double fValue2 = Double.parseDouble(strValue2);//new BigDecimal(strValue2).longValueExact();
+					double fValue1 = Double.parseDouble(strValue1.replace("%", ""));//new BigDecimal(strValue1).longValueExact();
+					double fValue2 = Double.parseDouble(strValue2.replace("%", ""));//new BigDecimal(strValue2).longValueExact();
 					
 					if(fValue1 < fValue2)
 						return +1;
@@ -2363,28 +2013,28 @@ public class ResultListHandler
 	}
 	
 	/**
-	 *    Helper function used to sort the rows in ascending order
+	 *    Helper function used to sort number containing columns in ascending order
 	 *    by the value specified in the column nIdx.
 	 */
-	private Comparator<Row> getAscNumberComparator(int nIdx)
+	private Comparator<Row> getAscNumberComparator(int nColIdx)
 	{
-		final int m_nIdx = nIdx;
+		final int m_nIdx = nColIdx;
 			
 		return new Comparator<Row>()
 		{
 			@Override
 			public int compare(Row arg0, Row arg1)
-			{
-				Label lab1 = (Label)arg0.getChildren().get(m_nIdx);
-				Label lab2 = (Label)arg1.getChildren().get(m_nIdx);
+			{				
+				Label lab1 = (Label)arg0.getChildren().get(m_nIdx).getChildren().get(0);
+				Label lab2 = (Label)arg1.getChildren().get(m_nIdx).getChildren().get(0);
 				
 				String strValue1 = lab1.getValue();
 				String strValue2 = lab2.getValue();
 				
 				if(!strValue1.equals("NA") && !strValue2.equals("NA"))
 				{
-					double fValue1 = Double.parseDouble(strValue1);
-					double fValue2 = Double.parseDouble(strValue2);
+					double fValue1 = Double.parseDouble(strValue1.replace("%", ""));
+					double fValue2 = Double.parseDouble(strValue2.replace("%", ""));
 					
 					if(fValue1 > fValue2)
 						return +1;
@@ -2402,4 +2052,1042 @@ public class ResultListHandler
 			}
 		};
 	}
+
+	/**
+	 *    Helper function used to sort number containing columns in descending order
+	 *    by the value specified in the column nIdx.
+	 */
+	private Comparator<Row> getDescTextComparator(int nColIdx)
+	{	
+		final int m_nIdx = nColIdx;
+		
+		return new Comparator<Row>()
+		{
+			@Override
+			public int compare(Row arg0, Row arg1)
+			{
+				Label lab1 = (Label)arg0.getChildren().get(m_nIdx).getChildren().get(0);
+				Label lab2 = (Label)arg1.getChildren().get(m_nIdx).getChildren().get(0);
+				
+				String strValue1 = lab1.getValue();
+				String strValue2 = lab2.getValue();
+				
+				return strValue1.compareTo(strValue2) * -1;
+			}
+		};
+	}
+	
+	/**
+	 *    Helper function used to sort number containing columns in ascending order
+	 *    by the value specified in the column nIdx.
+	 */
+	private Comparator<Row> getAscTextComparator(int nColIdx)
+	{
+		final int m_nIdx = nColIdx;
+			
+		return new Comparator<Row>()
+		{
+			@Override
+			public int compare(Row arg0, Row arg1)
+			{				
+				Label lab1 = (Label)arg0.getChildren().get(m_nIdx).getChildren().get(0);
+				Label lab2 = (Label)arg1.getChildren().get(m_nIdx).getChildren().get(0);
+				
+				String strValue1 = lab1.getValue();
+				String strValue2 = lab2.getValue();
+				
+				return strValue1.compareTo(strValue2);
+			}
+		};
+	}
+
+	/**
+	 * Adds column headers for manananggal results to the grid.
+	 * Also returns the PSI column for auto-sorting.
+	 * GridType 0 = permanent results
+	 * GridType 1 = temporary results
+	 * GridType 2 = imported results
+	 */
+	private Column AddColumnHeadersToGridForManananggalResults(Grid grid, int nGridType, int nDataType, boolean bInit) throws ClassNotFoundException, InstantiationException, IllegalAccessException
+	{
+		ResultFilterRule resultFilterRule = null;
+		switch(nGridType)
+		{
+			case GRID_TYPE_PERMANENT: resultFilterRule = m_resultFilterRulePermanentList; break;
+			case GRID_TYPE_TEMPORARY: resultFilterRule = m_resultFilterRuleTemporaryList; break;
+			case GRID_TYPE_IMPORT:    resultFilterRule = m_resultFilterRuleImportedList;  break;
+		}
+		
+		// prepare filter values on first open
+		if(bInit)
+		{
+			TreeSet<String> vcConditionsA = new TreeSet<String>();
+			TreeSet<String> vcConditionsB = new TreeSet<String>();
+
+			TreeSet<AnalysisResult> vcResults = m_resultHandler.GetAllResults();
+
+			for(AnalysisResult res : vcResults)
+			{
+				vcConditionsA.add(res.GetConditionA());
+				vcConditionsB.add(res.GetConditionB());
+			}
+			
+			TextFilter filter;
+			filter = new TextFilter(vcConditionsA);
+			resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_A, filter);
+			filter = new TextFilter(vcConditionsB);
+			resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_B, filter);
+			
+			TreeSet<String> vcStrings = new TreeSet<String>();
+			vcStrings.add("true");
+			vcStrings.add("false");
+			vcStrings.add("NA");
+			filter = new TextFilter(vcStrings);
+			resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI, filter);
+			filter = new TextFilter(vcStrings);
+			resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION, filter);
+		}
+		
+		//##################################
+		//           add header
+		//##################################
+		Columns cols = new Columns();
+		cols.setSizable(false);
+		cols.setParent(grid);
+			
+		int nColIdx = 0;		
+		AddColumnToGrid(cols, "", "30px", "center", false, nColIdx, -1, -1, nGridType, nDataType); nColIdx++; // space for result removal			
+		AddColumnToGrid(cols, "", "40px", "center", false, nColIdx, -1, -1, nGridType, nDataType); nColIdx++; // space for 'view result'
+		AddColumnToGrid(cols, "", "40px", "center", false, nColIdx, -1, -1, nGridType, nDataType); nColIdx++; // space for 'detailed view'
+		AddColumnToGrid(cols, "", "40px", "center", false, nColIdx, -1, -1, nGridType, nDataType); nColIdx++; // space for 'detailed description'
+		AddColumnToGrid(cols, "Rating",      "110px", "center", true, nColIdx, ResultFilterRule.OTHER_FILTER, ResultFilterRule.FILTER_RATING, nGridType, nDataType); nColIdx++; // space for 'detailed description'
+		AddColumnToGrid(cols, "Gene ID",     "140px", "center", true, nColIdx, -1, -1, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Gene Symbol", "140px", "center", true, nColIdx, -1, -1, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Condition A", "160px", "center", true, nColIdx,  ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_CONDITION_A, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Condition B", "160px", "center", true, nColIdx,  ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_CONDITION_B, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "AS Type",     "170px", "center", true, nColIdx,  ResultFilterRule.OTHER_FILTER, ResultFilterRule.FILTER_TYPE_AS_TYPE, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Result Type", "120px", "center", true, nColIdx, ResultFilterRule.OTHER_FILTER, ResultFilterRule.FILTER_TYPE_RESULT_TYPE, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Ratio Change (Exon A)",  "210px", "right", true, nColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Ratio Change (Exon B)",  "210px", "right", true, nColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_B, nGridType, nDataType); nColIdx++;		
+		AddColumnToGrid(cols, "PSI Change",             "150px", "right", true, nColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_PSI_CHANGE, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "p-value Ratio (Exon A)", "210px", "right", true, nColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "p-value Ratio (Exon B)", "210px", "right", true, nColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_B, nGridType, nDataType); nColIdx++;
+		Column colPSI = AddColumnToGrid(cols, "p-value PSI", "150px", "right", true, nColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_PSI, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Significant",    "150px", "center", true, nColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Novel Junction", "170px", "center", true, nColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Event Location", "200px","center",  false, nColIdx, -1, -1, nGridType, nDataType); nColIdx++;
+		AddColumnToGrid(cols, "Comment",        "410px", "left",   false, nColIdx, -1, -1, nGridType, nDataType);
+		
+		return colPSI;
+	}
+	
+	/**
+	 * Adds column headers for imported manananggal results to the grid
+	 */
+	private Column AddColumnHeadersToGridForImportedManananggalResults(Grid grid, int nGridType, int nDataType) throws ClassNotFoundException, InstantiationException, IllegalAccessException
+	{
+		//##################################
+		//           add header
+		//##################################
+		Columns cols = new Columns();
+		cols.setParent(grid);
+		
+		int ColIdx = 0;
+		AddColumnToGrid(cols, "", "40px", "center", false, ColIdx, -1, -1, nGridType, nDataType); ColIdx++; // space for 'view result'
+		AddColumnToGrid(cols, "Gene ID",     "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Gene Symbol", "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Condition A", "160px", "center", true, ColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_CONDITION_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Condition B", "160px", "center", true, ColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_CONDITION_B, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "AS Type",     "170px", "center", true, ColIdx, ResultFilterRule.OTHER_FILTER, ResultFilterRule.FILTER_TYPE_AS_TYPE, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Result Type", "120px", "center", true, ColIdx, ResultFilterRule.OTHER_FILTER, ResultFilterRule.FILTER_TYPE_RESULT_TYPE, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Ratio Change",  "210px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A, nGridType, nDataType); ColIdx++;	
+		AddColumnToGrid(cols, "PSI Change",    "150px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_PSI_CHANGE, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "p-value Ratio", "210px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		Column colPSI = AddColumnToGrid(cols, "p-value PSI", "150px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_PSI, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Significant",    "150px", "center", true, ColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Novel Junction", "170px", "center", true, ColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Event Location", "200px", "center", false, ColIdx, -1, -1, nGridType, nDataType);
+
+		return colPSI;
+	}
+	
+	/**
+	 * Adds column headers for imported DEXSeq results to the grid
+	 */
+	private Column AddColumnHeadersToGridForImportedDEXSeqResults(Grid grid, int nGridType, int nDataType)
+	{
+		//##################################
+		//           add header
+		//##################################
+		Columns cols = new Columns();
+		cols.setParent(grid);
+		
+		int ColIdx = 0;
+		AddColumnToGrid(cols, "", "40px", "center", false, ColIdx, -1, -1, nGridType, nDataType); ColIdx++; // space for 'view result'
+		AddColumnToGrid(cols, "Gene ID",     "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Gene Symbol", "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Condition A", "160px", "center", true, ColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_CONDITION_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Condition B", "160px", "center", true, ColIdx, ResultFilterRule.TEXT_FILTER, ResultFilterRule.FILTER_TYPE_CONDITION_B, nGridType, nDataType); ColIdx++;
+		Column colPSI = AddColumnToGrid(cols, "p-value", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "padj.", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "log2FC",  "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Event Location", "200px", "center", false, ColIdx, -1, -1, nGridType, nDataType);
+
+		return colPSI;
+	}
+
+	/**
+	 * Adds column headers for imported rMATS results to the grid
+	 */
+	private Column AddColumnHeadersToGridForImportedRMATSResults(Grid grid, int nGridType, int nDataType)
+	{
+		//##################################
+		//           add header
+		//##################################
+		Columns cols = new Columns();
+		cols.setParent(grid);
+		
+		int ColIdx = 0;
+		AddColumnToGrid(cols, "", "40px", "center", false, ColIdx, -1, -1, nGridType, nDataType); ColIdx++; // space for 'view result'
+		AddColumnToGrid(cols, "Gene ID",     "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Gene Symbol", "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		Column colPSI = AddColumnToGrid(cols, "p-value", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "FDR", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "inclusion change",  "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Event Location", "200px", "center", false, ColIdx, -1, -1, nGridType, nDataType);
+
+		return colPSI;
+	}
+	
+	
+	/**
+	 * Adds column headers for imported JSplice results to the grid
+	 */
+	private Column AddColumnHeadersToGridForImportedJSpliceResults(Grid grid, int nGridType, int nDataType)
+	{
+		//##################################
+		//           add header
+		//##################################
+		Columns cols = new Columns();
+		cols.setParent(grid);
+		
+		int ColIdx = 0;
+		AddColumnToGrid(cols, "", "40px", "center", false, ColIdx, -1, -1, nGridType, nDataType); ColIdx++; // space for 'view result'
+		AddColumnToGrid(cols, "Gene ID",     "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Gene Symbol", "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "AS Type",     "170px", "center", true, ColIdx, ResultFilterRule.OTHER_FILTER, ResultFilterRule.FILTER_TYPE_AS_TYPE, nGridType, nDataType); ColIdx++;
+		Column colPSI = AddColumnToGrid(cols, "adj. p-value", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "log2FC",  "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "Event Location", "200px", "center", false, ColIdx, -1, -1, nGridType, nDataType);
+
+		return colPSI;
+	}
+	
+	/**
+	 * Adds column headers for imported Cuffdiff results to the grid
+	 */
+	private Column AddColumnHeadersToGridForImportedCuffdiffResults(Grid grid, int nGridType, int nDataType)
+	{
+		//##################################
+		//           add header
+		//##################################
+		Columns cols = new Columns();
+		cols.setParent(grid);
+		
+		int ColIdx = 0;
+		AddColumnToGrid(cols, "", "40px", "center", false, ColIdx, -1, -1, nGridType, nDataType); ColIdx++; // space for 'view result'
+		AddColumnToGrid(cols, "Gene Symbol", "140px", "center", true, ColIdx, -1, -1, nGridType, nDataType); ColIdx++;
+		Column colPSI = AddColumnToGrid(cols, "p-value", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "q-value", "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_P_VALUE_RATIO_A, nGridType, nDataType); ColIdx++;
+		AddColumnToGrid(cols, "sqrt(JS)",  "140px", "right", true, ColIdx, ResultFilterRule.NUMERIC_FILTER, ResultFilterRule.FILTER_TYPE_RATIO_CHANGE_A, nGridType, nDataType);
+
+		return colPSI;
+	}
+
+	/**
+	 *   Adds a single column to the grid. May include a filter rule.
+	 *   - Cols is the column parent object
+	 *   - strLabel is the text shown in the column
+	 *   - strColWidth specifies the width of the column, e.g. "100px"
+	 *   - strAlign specifies the alignment of the text, e.g. "center"
+	 *   - bEnableSorting adds sorting functionality to the column
+	 *   - nComparatorColIdx specifies that the column (specified by this index) uses a default numeric comparator
+	 *   - nFiterType defines the type of filter rule (-1 = none, 0 = numeric filter, 1 = text filter, 2 = other filter)
+	 *   - nFilterSubtype specifies the filter sub type, e.g. FILTER_TYPE_CONDITION_A
+	 */
+	private Column AddColumnToGrid(Columns cols, String strLabel, String strColWidth, String strAlign, boolean bEnableSorting, int nComparatorColIdx, int nFilterType, int nFilterSubType, int nGridType, int nDataType)
+	{
+		Column col = new Column();		
+		col.setAlign(strAlign);
+		col.setParent(cols);
+		col.setWidth(strColWidth);
+		
+		if(nFilterType == -1)
+		{
+			if(bEnableSorting)
+			{
+				col.setSortAscending(getAscTextComparator(nComparatorColIdx));
+				col.setSortDescending(getDescTextComparator(nComparatorColIdx));
+			}
+			col.setLabel(strLabel);
+		}
+		else
+		{
+			Label lab = new Label(strLabel);
+			lab.setParent(col);
+			lab.setStyle("align: left; margin-right: 50px; font-weight: bold;");
+			
+			switch(nFilterType)
+			{
+				case ResultFilterRule.NUMERIC_FILTER:
+				{
+					col.setSortAscending(getAscNumberComparator(nComparatorColIdx));
+					col.setSortDescending(getDescNumberComparator(nComparatorColIdx));
+					AddNumberFilter(col, nFilterSubType, nGridType, nDataType, nComparatorColIdx);
+					break;
+				}
+				
+				case ResultFilterRule.TEXT_FILTER:
+				{
+					col.setSortAscending(getAscTextComparator(nComparatorColIdx));
+					col.setSortDescending(getDescTextComparator(nComparatorColIdx));
+					AddStringFilter(col, nFilterSubType, nGridType, nDataType, nComparatorColIdx);
+					break;
+				}
+				
+				case ResultFilterRule.OTHER_FILTER:
+				{
+					if(nFilterSubType == ResultFilterRule.FILTER_TYPE_AS_TYPE)
+					{
+						col.setSortAscending(getAscTextComparator(nComparatorColIdx));
+						col.setSortDescending(getDescTextComparator(nComparatorColIdx));
+						AddSplicingTypeFilter(col, nGridType, nDataType, nComparatorColIdx);						
+					}
+					else if(nFilterSubType == ResultFilterRule.FILTER_TYPE_RESULT_TYPE)
+					{
+						col.setSortAscending(getAscTextComparator(nComparatorColIdx));
+						col.setSortDescending(getDescTextComparator(nComparatorColIdx));
+						AddResultTypeFilter(col, nGridType, nDataType, nComparatorColIdx);
+					}
+					else if(nFilterSubType == ResultFilterRule.FILTER_RATING)
+					{
+						col.setSortAscending(getAscRatingComparator());
+						col.setSortDescending(getDescRatingComparator());
+					}
+					break;
+				}
+			}
+		}
+		
+		if(bEnableSorting)
+		{
+			try
+			{
+				col.setSort("auto");
+			}
+			catch(Exception e)
+			{
+				System.out.println("ERROR: Failed to set filter type for column: " + strLabel);
+				e.printStackTrace();
+				return null;
+			}
+			
+			col.addEventListener(Events.ON_SORT, new EventListener<Event>()
+			{
+				@Override
+				public void onEvent(Event event) throws Exception
+				{
+					m_Tabs.invalidate(); // if we don't force a redraw of the tabs, the grid will be truncated after sorting
+				}
+				
+			});
+		}
+		
+		return col;
+	}
+
+	/**
+	 * Adds a cell to a row in the grid.
+	 * nType: 0 = default, 1=remove button, 2=view button, 3=detail button, 4 = description button
+	 * nGridType: GRID_TYPE_PERMANENT, GRID_TYPE_TEMPORARY, GRID_TYPE_IMPORT
+	 */
+	private void AddCellToRow(Row parent, String strText, String strPrefixID, String strWidth, String strStyle, AnalysisResult res, int nType)
+	{
+		Cell cell = new Cell();
+		cell.setParent(parent);
+		cell.setAlign("center");
+		cell.setWidth(strWidth);
+
+		switch(nType)
+		{
+			case 0:
+			{
+				Label label = new Label(strText);
+				label.setStyle(strStyle);
+				label.setParent(cell);
+				break;
+			}
+		
+			case 1:
+			{
+				String strImageString = "/img/red_cross.png";
+				Image img = new Image(strImageString);
+				img.setHeight("18px");
+				img.setParent(cell);
+				img.setId(strPrefixID + res.GetID());
+				img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:pointer;");
+				
+				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+				{
+					public void onEvent(Event event) throws Exception
+					{
+						Image img = (Image)event.getTarget();
+		
+						int nID = Integer.parseInt(img.getId().split("_")[1]);
+						
+						m_resultHandler.RemoveResult(nID);
+						UpdatePermanentResultList(null);
+					}
+				});
+				break;
+			}
+		
+			case 2:
+			{
+				if(res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
+				{
+					Label label = new Label("");			
+					label.setParent(cell);
+				}
+				else
+				{
+					String strImageString = "/img/view.png";
+					
+					if(res.UsesNovelJunction())
+						strImageString = "/img/view_incomplete.png";
+					
+					Image img = new Image(strImageString);
+					img.setHeight("12px");
+					img.setParent(cell);
+					img.setId(strPrefixID + res.GetID());
+					img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:pointer;");
+					
+					img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+					{
+						public void onEvent(Event event) throws Exception
+						{
+							Image img = (Image)event.getTarget();
+		
+							String pSplit[] = img.getId().split("_");
+							String strGridType = pSplit[0];
+							int nGridType = GRID_TYPE_PERMANENT;
+							if(strGridType.startsWith("TMP"))
+							{
+								nGridType = GRID_TYPE_TEMPORARY;
+							}
+							else if(strGridType.startsWith("IMP"))
+							{
+								nGridType = GRID_TYPE_IMPORT;
+							}
+							int nID = Integer.parseInt(pSplit[1]);
+							
+							AnalysisResult res = null;
+							if(nGridType == GRID_TYPE_PERMANENT)
+							{
+								res = m_resultHandler.GetResult(nID);
+							}
+							else if(nGridType == GRID_TYPE_TEMPORARY)
+							{
+								res = m_resultHandler.GetTemporaryResult(nID);
+							}
+							else if(nGridType == GRID_TYPE_IMPORT)
+							{
+								res = GetImportedResult(nID);
+							}
+							m_App.PrepareHitForVisualization(res);
+							m_App.m_plotFactory.RequestCoverageRedraw();
+							m_App.m_plotFactory.DrawPlots();
+						}
+					});
+				}
+				break;
+			}
+		
+			case 3:
+			{
+				if(res.HasPSIScore() || res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
+				{
+					String strImageString = "/img/magnifier_blue.png";
+					
+					if(res.UsesNovelJunction())
+						strImageString = "/img/magnifier_red.png";
+					
+					Image img = new Image(strImageString);
+					img.setHeight("20px");
+					img.setParent(cell);
+					img.setId(strPrefixID + res.GetID());
+					img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:pointer;");
+					
+					img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+					{
+						public void onEvent(Event event) throws Exception
+						{
+							Image img = (Image)event.getTarget();
+
+							String pSplit[] = img.getId().split("_");
+							String strGridType = pSplit[0];
+							int nGridType = GRID_TYPE_PERMANENT;
+							if(strGridType.startsWith("TMP"))
+							{
+								nGridType = GRID_TYPE_TEMPORARY;
+							}
+							else if(strGridType.startsWith("IMP"))
+							{
+								nGridType = GRID_TYPE_IMPORT;
+							}
+							int nID = Integer.parseInt(pSplit[1]);
+							
+							AnalysisResult res = null;
+							if(nGridType == GRID_TYPE_PERMANENT)
+							{
+								res = m_resultHandler.GetResult(nID);
+							}
+							else if(nGridType == GRID_TYPE_TEMPORARY)
+							{
+								res = m_resultHandler.GetTemporaryResult(nID);
+							}
+							else if(nGridType == GRID_TYPE_IMPORT)
+							{
+								res = GetImportedResult(nID);
+							}
+							
+							m_App.PrepareHitForVisualization(res);
+							
+							if(res.GetType() == SplicingWebApp.AS_TYPE_RETAINED_INTRON)
+							{
+								m_App.m_plotFactory.DrawRetainedIntronCloseup(res);
+							}
+							else
+							{
+								m_App.m_plotFactory.DrawSpliceJunctionCloseup(res);
+							}
+						}
+					});
+				}
+				else
+				{
+					Label label = new Label("");			
+					label.setParent(cell);
+				}
+				break;
+			}
+		
+			case 4:
+			{
+				String strImageString = "/img/detailed_desc.png";
+				Image img = new Image(strImageString);
+				img.setWidth("16px");
+				img.setHeight("20px");
+				img.setParent(cell);
+				img.setId(strPrefixID + res.GetID());
+				img.setStyle("display: block; margin-left: auto; margin-right: auto; margin-top: 4px; margin-bottom: auto; cursor:hand; cursor:pointer;");
+				
+				img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+				{
+					public void onEvent(Event event) throws Exception
+					{
+						Image img = (Image)event.getTarget();
+						
+						String pSplit[] = img.getId().split("_");
+						String strGridType = pSplit[0];
+						int nGridType = GRID_TYPE_PERMANENT;
+						if(strGridType.startsWith("TMP"))
+						{
+							nGridType = GRID_TYPE_TEMPORARY;
+						}
+						else if(strGridType.startsWith("IMP"))
+						{
+							nGridType = GRID_TYPE_IMPORT;
+						}
+						int nID = Integer.parseInt(pSplit[1]);
+						
+						AnalysisResult res = null;
+						if(nGridType == GRID_TYPE_PERMANENT)
+						{
+							res = m_resultHandler.GetResult(nID);
+						}
+						else if(nGridType == GRID_TYPE_TEMPORARY)
+						{
+							res = m_resultHandler.GetTemporaryResult(nID);
+						}
+						else if(nGridType == GRID_TYPE_IMPORT)
+						{
+							res = GetImportedResult(nID);
+						}
+
+						m_App.PrepareHitForVisualization(res);
+						ShowDetailPopup(res);
+					}
+				});
+				break;
+			}
+			
+			case 5:
+			{
+				Hlayout layoutH = new Hlayout();
+				layoutH.setParent(cell);
+				for(int i=0; i<5; i++)
+				{
+					Image img = null;
+					
+					if(i<res.GetRating())
+					{
+						img = new Image("/img/good_rating.png");
+					}
+					else
+					{
+						img = new Image("/img/neutral_rating.png");
+					}
+					
+					img.setHeight("15px");
+					img.setParent(layoutH);
+					img.setId(strPrefixID + (i+1) + "_" + res.GetID());
+					img.setStyle("cursor:hand; cursor:pointer;");
+					
+					img.addEventListener(Events.ON_CLICK, new EventListener<Event>()
+					{
+						public void onEvent(Event event) throws Exception
+						{
+							Image img = (Image)event.getTarget();
+							
+							String pSplit[] = img.getId().split("_");
+							String strGridType = pSplit[0];
+							int nGridType = GRID_TYPE_PERMANENT;
+							if(strGridType.startsWith("TMP"))
+							{
+								nGridType = GRID_TYPE_TEMPORARY;
+							}
+							else if(strGridType.startsWith("IMP"))
+							{
+								nGridType = GRID_TYPE_IMPORT;
+							}
+							int nNewRating = Integer.parseInt(pSplit[1]);
+							int nID = Integer.parseInt(pSplit[2]);
+							
+							AnalysisResult res = null;
+							if(nGridType == GRID_TYPE_PERMANENT)
+							{
+								res = m_resultHandler.GetResult(nID);
+							}
+							else if(nGridType == GRID_TYPE_TEMPORARY)
+							{
+								res = m_resultHandler.GetTemporaryResult(nID);
+							}
+							else if(nGridType == GRID_TYPE_IMPORT)
+							{
+								res = GetImportedResult(nID);
+							}
+							
+							int nOldRating = res.GetRating();
+							
+							// remove rating if the same star was clicked again.
+							if(nNewRating == nOldRating)
+								nNewRating = 0;
+							
+							int i=0;
+							for(Component c : img.getParent().getChildren())
+							{
+								Image imgRating = (Image) c;
+								imgRating.invalidate();
+								
+								if(i < nNewRating)
+								{
+									imgRating.setSrc("/img/good_rating.png");
+								}
+								else
+								{
+									imgRating.setSrc("/img/neutral_rating.png");
+								}
+								i++;
+							}
+		
+							res.SetRating(nNewRating);
+							Row row = (Row)img.getParent().getParent().getParent();
+							row.setValue(nNewRating);
+						}
+					});
+				}
+				break;
+			}
+			
+			case 6:
+			{
+				Textbox boxComment = new Textbox();
+				boxComment.setParent(cell);
+				boxComment.setInplace(true);
+				boxComment.setWidth("99%");
+				boxComment.setStyle("margin-top: -5px; margin-bottom: -5px;");
+				boxComment.setHflex("1");
+				boxComment.setId(strPrefixID + res.GetID());
+				boxComment.setText(res.GetComment());
+				boxComment.setTooltiptext(res.GetComment());
+				
+				boxComment.addEventListener(Events.ON_CHANGE, new EventListener<Event>()
+				{
+					public void onEvent(Event event) throws Exception
+					{
+						Textbox box = (Textbox)event.getTarget();
+						
+						String strID = box.getId();
+						
+						String pSplit[] = strID.split("_");
+						int nID = Integer.parseInt(pSplit[1]);
+						
+						if(strID.startsWith("TMP"))
+						{
+							AnalysisResult res = m_resultHandler.GetTemporaryResult(nID);
+							res.SetComment(box.getText());
+						}
+						else
+						{
+							AnalysisResult res = m_resultHandler.GetResult(nID);
+							res.SetComment(box.getText());
+						}
+					}
+				});
+				break;
+			}
+			
+			case 7:
+			{
+				Checkbox checkbox = new Checkbox();
+				checkbox.setValue(res.GetID());
+				checkbox.setHeight("20px");
+				checkbox.setWidth("20px");
+				checkbox.setParent(cell);
+				break;
+			}
+		}
+	}
+
+	private void ModifyFilterValuesForImportedData()
+	{
+		// reset filters for the imported data
+		m_resultFilterRuleImportedList = new ResultFilterRule();
+		
+		// collect condition names for the condition filter
+		TreeSet<String> vcConditionsA = new TreeSet<String>();
+		TreeSet<String> vcConditionsB = new TreeSet<String>();
+		
+		// process imported results
+		for(AnalysisResult res : m_vcImportedResults)
+		{
+			vcConditionsA.add(res.GetConditionA());
+			vcConditionsB.add(res.GetConditionB());
+		}
+		
+		// prepare the filters
+		// modify filters
+		TextFilter filter;
+		filter = new TextFilter(vcConditionsA);
+		m_resultFilterRuleImportedList.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_A, filter);
+		filter = new TextFilter(vcConditionsB);
+		m_resultFilterRuleImportedList.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_B, filter);
+			
+		// these filters don't need to be changed afterwards, they are fine as is
+		TreeSet<String> vcStrings = new TreeSet<String>();
+		vcStrings.add("true");
+		vcStrings.add("false");
+		vcStrings.add("NA");
+		filter = new TextFilter(vcStrings);
+		m_resultFilterRuleImportedList.SetTextFilter(ResultFilterRule.FILTER_TYPE_SIGNIFICANT_PSI, filter);
+		filter = new TextFilter(vcStrings);
+		m_resultFilterRuleImportedList.SetTextFilter(ResultFilterRule.FILTER_TYPE_NOVEL_JUNCTION, filter);
+	}
+	
+	private void AddImportedManananggalDataToGrid(Rows parent)
+	{
+		// prepare number format
+		NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+		DecimalFormat format = (DecimalFormat)nf;
+		format.applyPattern("0.####E0");
+		
+		// process imported results
+		for(AnalysisResult res : m_vcImportedResults)
+		{			
+			if(!m_resultFilterRuleImportedList.bIsValidResult(res))
+				continue;
+			
+			Row row = new Row();
+			row.setId("IMPID_" + res.GetID());
+			row.setValue(res.GetRating());
+			row.setParent(parent);
+
+			AddCellToRow(row, "", "IMPview_", "40px", "float: center", res, 2);
+			
+			AddCellToRow(row, res.GetGeneID(),             "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionA(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionB(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetASTypeAsString(),     "", "170px", "float: center", res, 0);
+			AddCellToRow(row, res.GetResultTypeAsString(), "", "120px", "float: center", res, 0);
+			
+			if(res.HasAltExonA())
+			{
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetAbsoluteChangeA()*100);
+				if(Math.abs(res.GetAbsoluteChangeA()) < 0.05)
+					AddCellToRow(row, strText, "", "210px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "210px", "float: right", res, 0);
+			}
+			else
+			{
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
+			}
+			
+			if(res.HasPSIScore())
+			{
+				String strText = String.format(Locale.ENGLISH, "%.2f%%", res.GetInclusionChange()*100);
+				if(Math.abs(res.GetInclusionChange()) < 0.05)
+					AddCellToRow(row, strText, "", "150px", "float: right; color: red;", res, 0);
+				else
+					AddCellToRow(row, strText, "", "150px", "float: right", res, 0);
+			}
+			else
+			{
+				AddCellToRow(row, "NA", "", "150px", "float: right", res, 0);
+			}
+			
+			if(res.HasAltExonA())
+			{
+				AddCellToRow(row, format.format(res.GetPValueA()), "", "210px", "float: right", res, 0);	
+			}
+			else
+			{
+				AddCellToRow(row, "NA", "", "210px", "float: right", res, 0);
+			}
+	
+			if(res.HasPSIScore())
+			{
+				AddCellToRow(row, format.format(res.GetPValuePSI()), "", "150px", "float: right", res, 0);
+				AddCellToRow(row, String.format(Locale.ENGLISH, "%s", res.HasSignificantPSIScore()), "", "150px", "float: right", res, 0);
+				AddCellToRow(row, String.format(Locale.ENGLISH, "%s", res.UsesNovelJunction()), "", "170px", "float: right", res, 0);
+			}
+			else
+			{
+				AddCellToRow(row, "NA", "", "150px", "float: right", res, 0);
+				AddCellToRow(row, "NA", "", "150px", "float: center", res, 0);			
+				AddCellToRow(row, "NA", "", "170px", "float: center", res, 0);
+			}
+			
+			int nEventStart = Integer.MAX_VALUE;
+			int nEventEnd	= Integer.MIN_VALUE;
+			if(res.HasAltExonA())
+			{
+				nEventStart = Math.min(res.GetStartA(), nEventStart);
+				nEventEnd 	= Math.max(res.GetEndA(),   nEventEnd);
+			}
+
+			if(res.HasPSIScore())
+			{
+				nEventStart = Math.min(res.GetInclusionJunctionStart(), nEventStart);
+				nEventEnd 	= Math.max(res.GetInclusionJunctionEnd(),   nEventEnd);
+				
+				nEventStart = Math.min(res.GetExclusionJunctionStart(), nEventStart);
+				nEventEnd 	= Math.max(res.GetExclusionJunctionEnd(),   nEventEnd);
+			}
+
+			AddCellToRow(row, String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd), "", "200px", "float: left", res, 0);
+		}
+	}
+	
+	private void AddImportedDEXSeqDataToGrid(Rows parent)
+	{
+		// prepare number format
+		NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+		DecimalFormat format = (DecimalFormat)nf;
+		format.applyPattern("0.####E0");
+		
+		// process imported results
+		for(AnalysisResult res : m_vcImportedResults)
+		{			
+			if(!m_resultFilterRuleImportedList.bIsValidResult(res))
+				continue;
+			
+			Row row = new Row();
+			row.setId("IMPID_" + res.GetID());
+			row.setValue(res.GetRating());
+			row.setParent(parent);
+
+			AddCellToRow(row, "", "IMPview_", "40px", "float: center", res, 2);
+			
+			AddCellToRow(row, res.GetGeneID(),             "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionA(),         "", "160px", "float: center", res, 0);
+			AddCellToRow(row, res.GetConditionB(),         "", "160px", "float: center", res, 0);
+			
+			String strText = format.format(res.GetImportedDataPValue());
+			if(Math.abs(res.GetImportedDataPValue()) > 0.05)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+
+			strText = format.format(res.GetImportedDataAdjustedPValue());
+			if(Math.abs(res.GetImportedDataAdjustedPValue()) > 0.1)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			strText = String.format(Locale.ENGLISH, "%.4f", res.GetImportedDataLog2FC());
+			AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			int nEventStart = res.GetStartA();
+			int nEventEnd	= res.GetEndA();
+
+			AddCellToRow(row, String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd), "", "200px", "float: left", res, 0);
+		}
+	}
+	
+	private void AddImportedRMATSDataToGrid(Rows parent)
+	{
+		// prepare number format
+		NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+		DecimalFormat format = (DecimalFormat)nf;
+		format.applyPattern("0.####E0");
+		
+		// process imported results
+		for(AnalysisResult res : m_vcImportedResults)
+		{			
+			if(!m_resultFilterRuleImportedList.bIsValidResult(res))
+				continue;
+			
+			Row row = new Row();
+			row.setId("IMPID_" + res.GetID());
+			row.setValue(res.GetRating());
+			row.setParent(parent);
+
+			AddCellToRow(row, "", "IMPview_", "40px", "float: center", res, 2);
+			
+			AddCellToRow(row, res.GetGeneID(),             "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			
+			String strText = format.format(res.GetImportedDataPValue());
+			if(Math.abs(res.GetImportedDataPValue()) > 0.05)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+
+			strText = format.format(res.GetImportedDataFDR());
+			if(Math.abs(res.GetImportedDataFDR()) > 0.1)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			strText = String.format(Locale.ENGLISH, "%.4f", res.GetAbsoluteChangeA());
+			if(Math.abs(res.GetAbsoluteChangeA()) < 0.05)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			int nEventStart = res.GetStartA();
+			int nEventEnd	= res.GetEndA();
+
+			AddCellToRow(row, String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd), "", "200px", "float: left", res, 0);
+		}
+	}
+
+	private void AddImportedJSpliceDataToGrid(Rows parent)
+	{
+		// prepare number format
+		NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+		DecimalFormat format = (DecimalFormat)nf;
+		format.applyPattern("0.####E0");
+		
+		// process imported results
+		for(AnalysisResult res : m_vcImportedResults)
+		{			
+			if(!m_resultFilterRuleImportedList.bIsValidResult(res))
+				continue;
+			
+			Row row = new Row();
+			row.setId("IMPID_" + res.GetID());
+			row.setValue(res.GetRating());
+			row.setParent(parent);
+
+			AddCellToRow(row, "", "IMPview_", "40px", "float: center", res, 2);
+			
+			AddCellToRow(row, res.GetGeneID(),             "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			AddCellToRow(row, res.GetASTypeAsString(),     "", "170px", "float: center", res, 0);
+			
+			String strText = format.format(res.GetImportedDataPValue());
+			if(Math.abs(res.GetImportedDataPValue()) > 0.05)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			strText = String.format(Locale.ENGLISH, "%.4f", res.GetImportedDataLog2FC());
+			if(Math.abs(res.GetImportedDataLog2FC()) < 2)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			int nEventStart = res.GetStartA();
+			int nEventEnd	= res.GetEndA();
+
+			AddCellToRow(row, String.format(Locale.ENGLISH, "%s:%,d - %,d", res.GetReferenceName(), nEventStart, nEventEnd), "", "200px", "float: left", res, 0);
+		}
+	}
+	
+	private void AddImportedCuffdiffDataToGrid(Rows parent)
+	{
+		// prepare number format
+		NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
+		DecimalFormat format = (DecimalFormat)nf;
+		format.applyPattern("0.####E0");
+		
+		// process imported results
+		for(AnalysisResult res : m_vcImportedResults)
+		{			
+			if(!m_resultFilterRuleImportedList.bIsValidResult(res))
+				continue;
+			
+			Row row = new Row();
+			row.setId("IMPID_" + res.GetID());
+			row.setValue(res.GetRating());
+			row.setParent(parent);
+
+			AddCellToRow(row, "", "IMPview_", "40px", "float: center", res, 2);
+
+			AddCellToRow(row, res.GetGeneSymbol(),         "", "140px", "float: center", res, 0);
+			
+			String strText = format.format(res.GetImportedDataPValue());
+			if(Math.abs(res.GetImportedDataPValue()) > 0.05)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			strText = format.format(res.GetImportedDataAdjustedPValue());
+			if(Math.abs(res.GetImportedDataAdjustedPValue()) > 0.1)
+				AddCellToRow(row, strText, "", "140px", "float: right; color: red;", res, 0);
+			else
+				AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+			
+			strText = String.format(Locale.ENGLISH, "%.4f", res.GetImportedDataLog2FC());
+			AddCellToRow(row, strText, "", "140px", "float: right", res, 0);
+		}
+	}
+	
+	/**
+	 * Retrieves an imported splicing result
+	 */
+	private AnalysisResult GetImportedResult(int nID)
+	{
+		for(AnalysisResult res : m_vcImportedResults)
+			if(res.GetID() == nID)
+				return res;
+		
+		return null;
+	}
+
 }

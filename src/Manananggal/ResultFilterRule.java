@@ -26,12 +26,19 @@ package Manananggal;
 public class ResultFilterRule
 {	
 	// define the result filter IDs
+	
+	static final int NUMERIC_FILTER					= 0;
+	static final int TEXT_FILTER					= 1;
+	static final int OTHER_FILTER					= 2;
+	
+	// text filters
 	static final int FILTER_TYPE_CONDITION_A 		= 0;
 	static final int FILTER_TYPE_CONDITION_B 		= 1;
 	static final int FILTER_TYPE_SIGNIFICANT_PSI	= 2;
 	static final int FILTER_TYPE_NOVEL_JUNCTION		= 3;
 	private static final int MAX_TEXT_FILTERS		= 4;
 	
+	// numeric filters
 	static final int FILTER_TYPE_RATIO_CHANGE_A		= 0;
 	static final int FILTER_TYPE_RATIO_CHANGE_B		= 1;
 	static final int FILTER_TYPE_PSI_CHANGE			= 2;
@@ -39,6 +46,11 @@ public class ResultFilterRule
 	static final int FILTER_TYPE_P_VALUE_RATIO_B	= 4;
 	static final int FILTER_TYPE_P_VALUE_PSI		= 5;
 	private static final int MAX_NUMBER_FILTERS		= 6;
+	
+	// other filters
+	static final int FILTER_TYPE_AS_TYPE			= 0;
+	static final int FILTER_TYPE_RESULT_TYPE		= 1;
+	static final int FILTER_RATING					= 2;
 
 	// arrays that store the filters
 	private boolean 		m_bShowASTypes[];

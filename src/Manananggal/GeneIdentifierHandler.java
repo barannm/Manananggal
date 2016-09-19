@@ -30,9 +30,9 @@ import BioKit.Gene;
  */
 public class GeneIdentifierHandler
 {
-	Vector<GeneIdentifier>		m_vcGeneIdentifiers;
-	Vector<GeneIdentifierRange> m_vcRangesEnsemblIDs;
-	Vector<GeneIdentifierRange> m_vcRangesSymbols;
+	private Vector<GeneIdentifier>		m_vcGeneIdentifiers;
+	private Vector<GeneIdentifierRange> m_vcRangesEnsemblIDs;
+	private Vector<GeneIdentifierRange> m_vcRangesSymbols;
 	
 	/** Helper class used to index the gene identifiers for faster access*/
 	private class GeneIdentifierRange
@@ -289,6 +289,42 @@ public class GeneIdentifierHandler
 	public Vector<GeneIdentifier> GetAllGeneIdentifiers()
 	{
 		return m_vcGeneIdentifiers;
+	}
+	
+	/**
+	 * Returns a list of gene identifiers that are unique based on the gene symbol.
+	 */
+	public Vector<GeneIdentifier> GetAllUniqueGeneIdentifiers()
+	{
+		Vector<GeneIdentifier> vcResult = new Vector<GeneIdentifier>();
+		
+		TreeSet<String> vcIDsAdded = new TreeSet<String>();
+		
+		for(GeneIdentifier gid : m_vcGeneIdentifiers)
+		{
+			if(vcIDsAdded.contains(gid.m_strEnsemblGeneID))
+				continue;
+			
+			if(gid.m_bIsValid)
+			{
+				vcIDsAdded.add(gid.m_strEnsemblGeneID);
+				vcResult.add(gid);
+			}
+		}
+		
+		for(GeneIdentifier gid : m_vcGeneIdentifiers)
+		{
+			if(vcIDsAdded.contains(gid.m_strEnsemblGeneID))
+				continue;
+			
+			if(gid.m_bIsValid)
+			{
+				vcIDsAdded.add(gid.m_strEnsemblGeneID);
+				vcResult.add(gid);
+			}
+		}
+
+		return vcResult;
 	}
 
 	/**
