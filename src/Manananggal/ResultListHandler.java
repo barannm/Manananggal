@@ -1574,12 +1574,12 @@ public class ResultListHandler
 						
 						double fCount = 0.0;
 						if(vcCountsA.containsKey(strSample))
-							fCount = vcCountsA.get(strSample) * mapSizeFactorsToSamples.get(strSample);
+							fCount = vcCountsA.get(strSample) / mapSizeFactorsToSamples.get(strSample);
 						vcValuesA.add(fCount);
 						
 						fCount = 0.0;
 						if(vcCountsB.containsKey(strSample))
-							fCount = vcCountsB.get(strSample) * mapSizeFactorsToSamples.get(strSample);
+							fCount = vcCountsB.get(strSample) / mapSizeFactorsToSamples.get(strSample);
 						vcValuesB.add(fCount);
 					}
 				}
@@ -2124,7 +2124,11 @@ public class ResultListHandler
 			TreeSet<String> vcConditionsA = new TreeSet<String>();
 			TreeSet<String> vcConditionsB = new TreeSet<String>();
 
-			TreeSet<AnalysisResult> vcResults = m_resultHandler.GetAllResults();
+			TreeSet<AnalysisResult> vcResults = null;
+			if(nGridType == GRID_TYPE_TEMPORARY)
+				vcResults = m_resultHandler.GetAllTemporaryResults();
+			else
+				vcResults = m_resultHandler.GetAllResults();
 
 			for(AnalysisResult res : vcResults)
 			{
@@ -2137,7 +2141,7 @@ public class ResultListHandler
 			resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_A, filter);
 			filter = new TextFilter(vcConditionsB);
 			resultFilterRule.SetTextFilter(ResultFilterRule.FILTER_TYPE_CONDITION_B, filter);
-			
+
 			TreeSet<String> vcStrings = new TreeSet<String>();
 			vcStrings.add("true");
 			vcStrings.add("false");
@@ -2258,7 +2262,6 @@ public class ResultListHandler
 
 		return colPSI;
 	}
-	
 	
 	/**
 	 * Adds column headers for imported JSplice results to the grid

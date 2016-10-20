@@ -2351,11 +2351,12 @@ public class PlotFactory
 					graph.drawRect(nIntronStart, nY+7, nIntronLength, 6);
 					
 					area = new Area();
-					area.setId("edge_" + nPreviousExonGrpID + "_" + nExonGrpID + " " + strIsoform + " " + previousExon.getExonID() + " " + exon.getExonID());
+//					area.setId("intron_" + nPreviousExonGrpID + "_" + nExonGrpID + " " + strIsoform + " " + previousExon.getExonID() + " " + exon.getExonID());
+					area.setId("intron_" + dataSupplier.GetReferenceName() + "_" + previousExon.getGenomicStop() + "_" + exon.getGenomicStart());
 					area.setShape("rectangle");
 					area.setCoords(nIntronStart + ", " + (nY+7) + ", " + (nIntronStart+nIntronLength) + ", " + (nY+13));
 										
-					String strToolTip = String.format(Locale.ENGLISH, "%s\nedge ex%d - ex%d\n%s: %,d - %,d", strIsoform, nPreviousExonGrpID, nExonGrpID, dataSupplier.GetReferenceName(), previousExon.getGenomicStop()+1, exon.getGenomicStart()-1);
+					String strToolTip = String.format(Locale.ENGLISH, "%s\nintron ex%d - ex%d\n%s: %,d - %,d", strIsoform, nPreviousExonGrpID, nExonGrpID, dataSupplier.GetReferenceName(), previousExon.getGenomicStop()+1, exon.getGenomicStart()-1);
 					area.setTooltiptext(strToolTip);
 					area.setParent(imgMapIsoforms);
 				}
@@ -2545,6 +2546,14 @@ public class PlotFactory
 					m_app.m_plotFactoryGTEX.ShowGTEXDataForExon(evnt.getArea());
 					return;
 				}
+				else if(evnt.getArea().startsWith("intron"))
+				{
+					String pSplit[] = evnt.getArea().split("_");
+					int nJunStart = Integer.parseInt(pSplit[2]);
+					int nJunEnd = Integer.parseInt(pSplit[3]);
+					
+					DrawJunctionBoxplot(nJunStart, nJunEnd);
+				}
 			}
 		});
 	}
@@ -2622,7 +2631,7 @@ public class PlotFactory
 			
 			for(String strSample : mapCountsToSamples.keySet())
 			{
-				double fValue = mapCountsToSamples.get(strSample) * mapSizeFactors.get(strSample);
+				double fValue = mapCountsToSamples.get(strSample) / mapSizeFactors.get(strSample);
 				fMaxCount = Math.max(fMaxCount, fValue);
 			}
 		}
@@ -2641,7 +2650,7 @@ public class PlotFactory
 
 			for(String strSample : mapCountsToSamples.keySet())
 			{
-				double fValue = mapCountsToSamples.get(strSample) * mapSizeFactors.get(strSample);
+				double fValue = mapCountsToSamples.get(strSample) / mapSizeFactors.get(strSample);
 				fRowMaxCount = Math.max(fRowMaxCount, fValue);
 				
 				if(fValue >= nMinJunctionReads)
@@ -2698,7 +2707,7 @@ public class PlotFactory
 			double fRowMaxCount = 0;
 			for(String strSample : mapCountsToSamples.keySet())
 			{
-				double fValue = mapCountsToSamples.get(strSample) * mapSizeFactors.get(strSample);
+				double fValue = mapCountsToSamples.get(strSample) / mapSizeFactors.get(strSample);
 				fRowMaxCount = Math.max(fRowMaxCount, fValue);
 			}
 
@@ -2723,7 +2732,7 @@ public class PlotFactory
 					
 					if(mapCountsToSamples.containsKey(strSample))
 					{
-						fValue = mapCountsToSamples.get(strSample) * mapSizeFactors.get(strSample);
+						fValue = mapCountsToSamples.get(strSample) / mapSizeFactors.get(strSample);
 					}
 					
 					Shape rect = new Rectangle2D.Double(nX, nY, 20, 20);
@@ -2753,7 +2762,7 @@ public class PlotFactory
 			double fRowMaxCount = 0;
 			for(String strSample : mapCountsToSamples.keySet())
 			{
-				double fValue = mapCountsToSamples.get(strSample) * mapSizeFactors.get(strSample);
+				double fValue = mapCountsToSamples.get(strSample) / mapSizeFactors.get(strSample);
 				fRowMaxCount = Math.max(fRowMaxCount, fValue);
 			}
 			
@@ -2779,7 +2788,7 @@ public class PlotFactory
 					
 					if(mapCountsToSamples.containsKey(strSample))
 					{
-						fValue = mapCountsToSamples.get(strSample) * mapSizeFactors.get(strSample);
+						fValue = mapCountsToSamples.get(strSample) / mapSizeFactors.get(strSample);
 					}
 					
 					pCounts[nIdx] = fValue;
@@ -2874,9 +2883,107 @@ public class PlotFactory
 	}
 
 	/**
+	 *    Draws boxplots for a single splice junction
+	**/
+	public void DrawJunctionBoxplot(int nJunStart, int nJunEnd) throws IOException
+	{
+		ProjectModel projectModel				= m_app.GetProjectModel();
+		DataSupplier dataSupplier 				= m_app.GetDataSupplier();
+		String strSelectedConditionType 		= m_app.GetSelectedConditionType();
+		
+		// get size factors
+		TreeMap<String, Double> mapSizeFactorsToSamples = projectModel.GetSizeFactors();
+		
+		// get samples per Condition
+		TreeMap<String, TreeSet<String>> mapSamplesToConditions = projectModel.GetSamplesPerCondition(strSelectedConditionType);
+		
+		if(dataSupplier.GetGene() == null)
+		{
+			Messagebox.show("No gene selected!");
+			return;
+		}
+		
+		//##########################################################
+		//                 get junction counts
+		//##########################################################
+		
+		// get number of samples
+		int nSamples = projectModel.GetSamples().size();
+		
+		// get adjusted junction counts for each sample, grouped by condition
+		TreeMap<String, double[]> mapCountsToConditions = new TreeMap<String, double[]>();
+		Vector<String> vcDataLabels = new Vector<String>();
+		
+		double fMaxCount = 0.0;
+		for(CountElement jun : dataSupplier.GetJunctions())
+		{
+			if(jun.m_nStart == nJunStart && jun.m_nEnd == nJunEnd)
+			{
+				TreeMap<String, Integer> mapCountsToSamples = dataSupplier.GetCountsForJunction(jun);
+				
+				for(String strCondition : mapSamplesToConditions.keySet())
+				{
+					Vector<Double> vcCounts = new Vector<Double>();
+					
+					for(String strSample : mapSamplesToConditions.get(strCondition))
+					{
+						double fCount = 0.0;
+						if(mapCountsToSamples.containsKey(strSample))
+							fCount = mapCountsToSamples.get(strSample) / mapSizeFactorsToSamples.get(strSample);
+						vcCounts.add(fCount);
+						fMaxCount = Math.max(fMaxCount, fCount);
+						
+						vcDataLabels.add(strSample);
+					}
+					
+					double pCounts[] = new double[vcCounts.size()];
+					for(int i=0; i<vcCounts.size(); i++)
+						pCounts[i] = vcCounts.get(i);
+					
+					mapCountsToConditions.put(strCondition, pCounts);
+				}
+				break;
+			}
+		}
+
+		//###################################
+		//       prepare popup window
+		//###################################
+		Window windowPopup = new Window();
+		windowPopup.setParent(m_app);
+		windowPopup.setWidth("600px");
+		windowPopup.setHeight("605px");
+		windowPopup.setTitle("Junction Boxplots");
+		windowPopup.setSizable(true);
+		windowPopup.setClosable(true);
+		windowPopup.setMaximizable(true);
+		windowPopup.setBorder(true);
+		windowPopup.setPosition("center,center");
+		windowPopup.setVisible(true);
+		windowPopup.doPopup();
+		windowPopup.setTopmost();
+		
+		//###################################################
+		//                   draw heatmap
+		//###################################################
+		
+		BufferedImage img = BoxPlot(mapCountsToConditions, nJunStart+"-"+nJunEnd, null, 65, 5, 405, "adj. count");
+		
+		windowPopup.setWidth( Math.min(m_nClientWindowWidth *0.75, (img.getWidth()+10))+"px");
+		windowPopup.setHeight(Math.min(m_nClientWindowHeight*0.75, (img.getHeight()+55))+"px");
+					
+		Imagemap imgMap = new Imagemap();
+		imgMap.setWidth(img.getWidth()+"px");
+		imgMap.setHeight(img.getHeight()+"px");
+		imgMap.setContent(img);
+		imgMap.setParent(windowPopup);
+	}
+	
+	/**
 	 *    Generates a box plot for the given count arrays per condition. The plot will be located at nX/nX with height nHeight on the graph.
+	 *    Returns the width [in pixel] of the plot.
 	 */
-	public void BoxPlot(TreeMap<String, double[]> mapCountsToConditions, String strTitle, Graphics2D graph, int nX, int nY, int nHeight, String strAxisTitleY)
+	public BufferedImage BoxPlot(TreeMap<String, double[]> mapCountsToConditions, String strTitle, Graphics2D graph, int nX, int nY, int nHeight, String strAxisTitleY)
 	{
 		// settings for the box plot
 		int nBarWidth 	= 80;
@@ -2884,6 +2991,18 @@ public class PlotFactory
 		int nTotalBarDistance = nBarWidth+nSpacer;
 		
 		int nWidth = mapCountsToConditions.keySet().size() * nTotalBarDistance;
+
+		// prepare a new graph if required
+		BufferedImage img = null;
+		if(graph == null)
+		{
+			img = new BufferedImage(nWidth+nX, nHeight+nY+45, BufferedImage.TYPE_INT_RGB); // +30 for the x-axis text
+			graph = img.createGraphics();
+			
+			// fill background
+			graph.setColor(Color.white);
+			graph.fillRect(0, 0, nWidth+nX, nHeight+nY+45);
+		}
 		
 		// process data
 		double fMaxValue = 1.0;
@@ -2924,6 +3043,7 @@ public class PlotFactory
 		
 		// add ticks to x-axis
 		int j = 0;
+		boolean bPreviousTextHadOffset = false;
 		for(String strCondition : mapCountsToConditions.keySet())
 		{
 			int nXPos = nX + j*nTotalBarDistance + (int)(nTotalBarDistance*0.5);
@@ -2931,7 +3051,15 @@ public class PlotFactory
 			
 			nStringWidth  = fontMetrics.stringWidth(strCondition);
 			
-			graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight+3);
+			if(nStringWidth > (nBarWidth+nSpacer*0.5))
+			{
+				if(bPreviousTextHadOffset)
+					bPreviousTextHadOffset = false;
+				else
+					graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight*2+3);				
+			}
+			else
+				graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight+3);
 			j++;
 		}
 		
@@ -2999,6 +3127,8 @@ public class PlotFactory
 			
 			j++;
 		}
+		
+		return img;
 	}
 	
 	/**
@@ -4352,7 +4482,7 @@ public class PlotFactory
 				{
 					double fCount = 0.0;
 					if(vcCountsA.containsKey(strSample))
-						fCount = vcCountsA.get(strSample) * mapSizeFactorsToSamples.get(strSample);
+						fCount = vcCountsA.get(strSample) / mapSizeFactorsToSamples.get(strSample);
 					vcValuesA.add(fCount);
 					
 					if(fCount > fMaxCountA)
@@ -4360,7 +4490,7 @@ public class PlotFactory
 					
 					fCount = 0.0;
 					if(vcCountsB.containsKey(strSample))
-						fCount = vcCountsB.get(strSample) * mapSizeFactorsToSamples.get(strSample);
+						fCount = vcCountsB.get(strSample) / mapSizeFactorsToSamples.get(strSample);
 					vcValuesB.add(fCount);
 					
 					if(fCount > fMaxCountB)

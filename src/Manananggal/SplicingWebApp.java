@@ -815,11 +815,12 @@ public class SplicingWebApp extends Window implements AfterCompose
 				}
 				catch(Exception e)
 				{
-					ErrorMessage.ShowError("ERROR: coult not open project file: " + m_parameters.m_project.GetFullPathOfProjectFile());
+					ErrorMessage.ShowError("ERROR: could not open project file: " + m_parameters.m_project.GetFullPathOfProjectFile());
 					e.printStackTrace();
 					Clients.clearBusy();
 					return;
 				}
+				
 				m_bandboxProjects.setText(m_parameters.m_project.GetProjectName());
 				
 				if(m_parameters.m_gid == null)
@@ -1684,7 +1685,7 @@ public class SplicingWebApp extends Window implements AfterCompose
 			pCoverage[nIdx] = pBigWigCoverage[nPos];
 			
 			if(bAdjustForSizeFactor)
-				pCoverage[nIdx] *= fSizeFactor;
+				pCoverage[nIdx] /= fSizeFactor;
 		}
 
 		return pCoverage;
@@ -1706,9 +1707,11 @@ public class SplicingWebApp extends Window implements AfterCompose
 			return;
 		}
 		
-		if(m_projectModel.GetSamples().size() > 50 && !bHideMessage)
+		if(m_projectModel.GetSamples().size() > 50)
 		{
-			Messagebox.show("The project has more than 50 samples. To speed up things, detection of retained introns was disabled. You can enable retained intron detection in the advanced options tab again.");
+			if(!bHideMessage)
+				Messagebox.show("The project has more than 50 samples. To speed up things, detection of retained introns was disabled. You can enable retained intron detection in the advanced options tab again.");
+
 			m_bDetectIntronRetentionEvents = false;
 			m_checkboxSkipIntronRetentionDetection.setChecked(m_bDetectIntronRetentionEvents);
 		}
@@ -1899,6 +1902,7 @@ public class SplicingWebApp extends Window implements AfterCompose
 			TreeSet<AnalysisResult> vcResults = analyzer.AnalyzeCurrentGene(m_hWindow, m_bSkipFirstAndLastExon, false, 0, false);
 			m_vcASResults.ClearTemporaryResults();
 			m_vcASResults.AddTemporaryResultsForCurrentlySelectedIsoforms(vcResults);
+
 			m_resultListHandler.UpdateTemporaryResultList(m_vcASResults);
 		}
 		else
