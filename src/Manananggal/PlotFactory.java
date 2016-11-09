@@ -57,6 +57,7 @@ import org.zkoss.zk.ui.event.MouseEvent;
 import org.zkoss.zul.Area;
 import org.zkoss.zul.Column;
 import org.zkoss.zul.Columns;
+import org.zkoss.zul.Div;
 import org.zkoss.zul.Grid;
 import org.zkoss.zul.Hlayout;
 import org.zkoss.zul.Imagemap;
@@ -1289,11 +1290,20 @@ public class PlotFactory
 
 		if(bAsPopupWindow)
 		{
+			windowPopup.setWidth( Math.min(m_nClientWindowWidth *0.75, (img.getWidth()+10))+"px");
+			windowPopup.setHeight(Math.min(m_nClientWindowHeight*0.75, (img.getHeight()+55))+"px");
+			
+			Div div = new Div();
+			div.setParent(windowPopup);
+			div.setStyle("overflow: auto;");
+			div.setHeight("100%");
+			div.setWidth("100%");
+			
 			Imagemap imgMapPopup = new Imagemap();			
 			imgMapPopup.setWidth(offsets.m_nTotalWidth+"px");
 			imgMapPopup.setHeight(nMaxHeight+"px");
 			imgMapPopup.setContent(img);
-			imgMapPopup.setParent(windowPopup);
+			imgMapPopup.setParent(div);
 		}
 		else
 		{
@@ -2907,9 +2917,6 @@ public class PlotFactory
 		//                 get junction counts
 		//##########################################################
 		
-		// get number of samples
-		int nSamples = projectModel.GetSamples().size();
-		
 		// get adjusted junction counts for each sample, grouped by condition
 		TreeMap<String, double[]> mapCountsToConditions = new TreeMap<String, double[]>();
 		Vector<String> vcDataLabels = new Vector<String>();
@@ -2961,7 +2968,7 @@ public class PlotFactory
 		windowPopup.setPosition("center,center");
 		windowPopup.setVisible(true);
 		windowPopup.doPopup();
-		windowPopup.setTopmost();
+		windowPopup.setTopmost();		
 		
 		//###################################################
 		//                   draw heatmap
@@ -2971,12 +2978,18 @@ public class PlotFactory
 		
 		windowPopup.setWidth( Math.min(m_nClientWindowWidth *0.75, (img.getWidth()+10))+"px");
 		windowPopup.setHeight(Math.min(m_nClientWindowHeight*0.75, (img.getHeight()+55))+"px");
+		
+		Div div = new Div();
+		div.setParent(windowPopup);
+		div.setStyle("overflow: auto;");
+		div.setHeight("100%");
+		div.setWidth("100%");
 					
 		Imagemap imgMap = new Imagemap();
 		imgMap.setWidth(img.getWidth()+"px");
 		imgMap.setHeight(img.getHeight()+"px");
 		imgMap.setContent(img);
-		imgMap.setParent(windowPopup);
+		imgMap.setParent(div);
 	}
 	
 	/**
@@ -3043,23 +3056,51 @@ public class PlotFactory
 		
 		// add ticks to x-axis
 		int j = 0;
-		boolean bPreviousTextHadOffset = false;
+		boolean bPreviousTextTooLong   = false;
+		boolean bPreviousTextHadOffset = true; // just set it true so that the first item won't have an offset
+		
 		for(String strCondition : mapCountsToConditions.keySet())
 		{
 			int nXPos = nX + j*nTotalBarDistance + (int)(nTotalBarDistance*0.5);
 			graph.drawLine(nXPos, nY+nHeight, nXPos, nY+nHeight+3);
 			
 			nStringWidth  = fontMetrics.stringWidth(strCondition);
-			
-			if(nStringWidth > (nBarWidth+nSpacer*0.5))
+
+			if(bPreviousTextHadOffset)
 			{
-				if(bPreviousTextHadOffset)
-					bPreviousTextHadOffset = false;
-				else
-					graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight*2+3);				
+				graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight+3);
+				bPreviousTextHadOffset = false;
+				
+				if(nStringWidth > (nBarWidth+nSpacer*0.3))
+				{
+					bPreviousTextTooLong = true;
+				}
 			}
 			else
-				graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight+3);
+			{
+				if(nStringWidth > (nBarWidth+nSpacer*0.3))
+				{
+					// draw with offset
+					graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight*2+3);
+					
+					bPreviousTextHadOffset = true;
+					bPreviousTextTooLong   = true;
+				}
+				else
+				{
+					if(bPreviousTextTooLong)
+					{
+						graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight*2+3);
+						bPreviousTextHadOffset = true;
+						bPreviousTextTooLong   = false;
+					}
+					else
+					{
+						graph.drawString(strCondition, (int)(nXPos-nStringWidth*0.5), nY+nHeight+nStringHeight+3);
+					}
+				}
+			}
+			
 			j++;
 		}
 		
