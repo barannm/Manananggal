@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta charset="utf-8">
+	<link rel="stylesheet" type="text/css" href="./css/manual.css">
+	</head>
+	
+	<body>
+		<div class="title_div">
+		<h1 class="title">Manananggal – Userguide</h1>
+		
+		<!-- DEFINE POPUPS FOR FULL SIZED IMAGES -->
+		<div class=light id="full_size_unique_isoform_elements">
+			<figure>
+				<img src='./img/unique_isoform_elements.png' style="width: 962px; height:346px;">
+				<figcaption>
+					<p>Exons that are unique to a certain isoform are colored in yellow, or orange if they are too similar to other exons (e.g. they differ by only a few base pairs). </p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_specificity1">
+			<figure>
+				<img src='./img/tissue_specificity_1.png' style="width: 960px; height:304px;">
+				<figcaption>
+					<p style="margin-bottom: 0px;">Exon specificity is shown by a color gradient on the meta exon track (red=specific, blue=unspecific).</p>
+					<p style="margin-top: 5px;">Numbers above the meta exons correspond to the specificity (1 = very specific)</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_specificity2">
+			<figure>
+				<img src='./img/tissue_specificity_2.png' style="width: 1291px; height:456px;">
+				<figcaption>
+					<p>This example shows the tissue specific expression of a red colored exon with specificity index of 0.75. Apparently, these exons are only expressed in brain tissues (category 8 to 20).</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_specificity3">
+			<figure>
+				<img src='./img/tissue_specificity_3.png' style="width: 1291px; height:456px;">
+				<figcaption>
+					<p>This graphs shows how tissue specific the expression of the currently selected gene is. Apparently, the gene is mostly expressed in a leukemia cell line (22) and liver (34).</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_relative_coverage_plot">
+			<figure>
+				<img src='./img/relative_coverage.png' style="width: 1863px; height:572px;">
+				<figcaption>
+					<p>The alternative representation of the coverage as coverage ratios can facilitate the detection of alternatively spliced exons. Two such exons are marked by red exclamation marks in the example.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_log2_coverage_plot">
+			<figure>
+				<img src='./img/log2_coverage.png' style="width: 1864px; height:572px;">
+				<figcaption>
+					<p>Log2 transformed coverage plot.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_multiple_coverage_tracks">
+			<figure>
+				<img src='./img/full_size_multiple_coverage_tracks.png' style="width: 1000px; height:460px;">
+				<figcaption>
+					<p>Multiple coverage tracks.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_isoform_removal">
+			<figure>
+				<img src='./img/isoform_removal.png' style="width: 980px; height:449px;">
+				<figcaption>
+					<p>Isoforms marked with a red exclamation mark will be removed because they contain central exons that either don't have enough coverage or that don't have sufficient read support linking the exon to a neighbouring exon. In the example, we used a minimum junction read coverage and exon coverage of 5. Eventhough the last isoform is also likely not expressed it will be retained, because we do not remove isoforms if only their first or last exon have unsufficient coverage.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_mmseq">
+			<figure>
+				<img src='./img/mmseq.png' style="width: 1139px; height:259px;">
+				<figcaption>
+					<p>After running MMSEQ, isoform expression estimates are shown behind each isoform for all conditions. We removed some isoforms in the plot above to keep it smaller, thus the estimates won't add up to 100%.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_junction_heatmap">
+			<figure>
+				<img src='./img/junction_heatmap.png' style="width: 429px; height:259px;">
+				<figcaption>
+					<p>The above plot shows only a small part of the complete heatmap, which is divided into two parts. The upper part shows a heatmap for all junctions identified within the gene locus. The color gradient reaches from black (no coverage) to red (junction with highest coverage of all junctions).<br>The second heatmap shows only junctions that passed the <a class=text_link style="text-shadow: none;" href=#>junction count filter</a> in at least three samples. Each row of this plot is colored using an individual gradient that ranges from black (no coverage) to red (sample with highest coverage for this junction). A simple Annova test is used to identify rows that differ between the conditions, indiciated by exclamation signs.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_results2">
+			<figure>
+				<img src='./img/results_2.png' style="width: 969px; height:339px;">
+				<figcaption>
+					<p>The plot shows the coverage tracks for both conditions (top) and the isoform track for GS689_li (bottom). An alternative terminal exon event was selected (alt_start_unique_jun_double), thus two terminal exons were showing changes in the coverage ratio ('double') that are colored in red. Further, the two junctions connecting to these exons (also shown in red) are unique junctions (i.e. the junctions only link to the terminal exon, but no other exons). Similar, if an exon skipping event was selected, one exon and the inclusion and exclusion junctions would be colored red. Low coverages are shown in brighter color and high coverage in dark color.</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_results3">
+			<figure>
+				<img src='./img/results_3.png' style="width: 1314px; height:694px;"/>
+				<figcaption>
+					<p>This is the detailed view of an alternative terminal exon splicing event. Shown at the top is a coverage track for the event and at the bottom three boxplots and one 2D plot. Starting from the left, the first box plot shows the coverage distribution of the first junction, the second boxplot the coverage distribution of the second junction and the third boxplot shows the ratio of junction1 / (junction1 + junction2). The last plot shows each sample based on the coverage of the first junction (x-axis) and second junction (y-axis).</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=fade id="fade" onClick="lightbox_close();"></div>
+	
+		<!-- SECTIONS -->
+		<nav class="nav_effect">
+		<ul>
+			<li>
+				<a href="./installation.html">Installation</a>
+				<ul>
+				<li><a href="./installation.html#console_app">Installing the console application</a></li>
+				<li><a href="./installation.html#web_app">Installing the web application</a></li>
+				<li><a href="./installation.html#crossref">Cross-reference file</a></li>
+				<li><a href="./installation.html#counts_tissue_gene">Tissue specific gene expression</a></li>
+				<li><a href="./installation.html#counts_tissue_exon">Tissue specific exon expression</a></li>			
+				</ul>
+			</li>
+			<li>
+				<a href="./new_project.html">Adding projects</a>
+				<ul>
+					<li><a href="./new_project.html#requirements">Requirements</a></li>
+					<li><a href="./new_project.html#bigwig">Generation of BigWig files</a></li>
+					<li><a href="./new_project.html#count_files">Generation of count files</a></li>
+					<li><a href="./new_project.html#project_file">Preparing the project file</a></li>
+					<li><a href="./new_project.html#merging">Merging junction count files</a></li>
+				</ul>
+			</li>
+			<li>
+				<a href="./console_application.html">The console app</a>
+				<ul>
+					<li><a href="./console_application.html#running">Running the Console Application</a></li>
+					<li><a href="./console_application.html#output">Output Format</a></li>						
+				</ul>
+			</li>
+			<li><a href="./viewer.html">The viewer</a>
+				<ul>
+					<li><a href="./viewer.html#Overview">Overview</a></li>
+					<li><a href="./viewer.html#Settings">Settings Menu</a></li>
+					<li><a href="./viewer.html#Options">Option Menu</a></li>
+					<li><a href="./viewer.html#Samples">Sample Selection</a></li>
+					<li><a href="./viewer.html#Colors">Sample Colors</a></li>
+					<li><a href="./viewer.html#Isoforms">Isoform Selection</a></li>
+					<li><a href="./viewer.html#AdvancedOptions">Advanced Options Menu</a></li>
+					<li><a href="./viewer.html#Results">Results Window</a></li>
+					<li><a href="./viewer.html#Coverage">Coverage Plot</a></li>
+					<li><a href="./viewer.html#IsoformPlot">Isoform Plot</a></li>
+					<li><a href="./viewer.html#NewFeatures">New Features</a></li>					
+				</ul>
+			</li>
+			<li><a href="./interpreting_results.html">Interpreting results</a></li>
+			<li><a href="./tutorial.html">Tutorial</a>
+			  <ul>
+			  	<li><a href="./tutorial.html#preamble">Preamble</a></li>
+			  	<li><a href="./tutorial.html#data_selection">Data Loading</a></li>
+				<li><a href="./tutorial.html#isoform_selection">Isoform Choice</a></li>
+				<li><a href="./tutorial.html#result_list">Result List</a></li>
+				<li><a href="./tutorial.html#alt_start">Example 2</a></li>
+				<li><a href="./tutorial.html#exon_extension">Example 3</a></li>
+			  </ul>
+			</li>
+		</ul>
+	  </nav>
+	</div>
+			
+		<div class="content_div">
+		
+			<a class="anchor" id="Overview">&nbsp;</a>
+			<section class=mysection>				
+				<header><h1>Overview</h1> </header>
+				<div class=mydiv>
+					<p><font style="color: hsl(60, 100%, 70%);">Click on any element</font> to learn more about it.</p>
+					<p><img src="./img/exclamation_sign.png" style="display: inline-block; top:10px; width:40px"/>After refreshing the page it can happen that the overlay no longer functions in Google Chrome. In this case, please click on the URL and press enter to force a full reload.</p>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img id="imgMap1" src="./img/full_page.png" usemap="#imgMap">
+							<map name="imgMap">
+								<area shape="rect" coords="20,14,519,234" 		href="./viewer.html#Settings" 	data-org_coords="20,14,519,234" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="20,240,519,534" 		href="./viewer.html#Options" 	data-org_coords="20,240,519,534" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="525,14,804,534" 		href="./viewer.html#Samples" 	data-org_coords="525,14,804,534" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="814,14,1013,483" 	href="./viewer.html#Colors" 	data-org_coords="814,14,1013,483" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="1019,14,1418,534" 	href="./viewer.html#Isoforms" 	data-org_coords="1019,14,1418,534" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="1424,14,1923,483"	href="./viewer.html#AdvancedOptions" data-org_coords="1424,14,1923,483" 	data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="1930,14,2956,483"	href="./viewer.html#Results" 	data-org_coords="1930,14,2956,483" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="6,570,1888,849"		href="./viewer.html#Coverage" 	data-org_coords="6,570,1888,849" 		data-color_highlight="rgba(0,0,255,0.2)">
+								<area shape="rect" coords="5,850,1888,1139" 	href="./viewer.html#IsoformPlot" data-org_coords="5,850,1888,1139" 		data-color_highlight="rgba(0,0,255,0.2)">
+							</map>
+							<canvas id="canvas_imgMap1"></canvas>
+						</div>
+					</div>
+				</div>
+			</section>
+ 			
+ 			<a class="anchor" id="Settings">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Settings</h1></header>
+				<div class=mydiv>
+					<p><font style="color: hsl(60, 100%, 70%);">Click on any element</font> to learn more about it.</p>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img id="imgMap2" src="./img/settings.png" usemap="#imgMap2">
+							<map name="imgMap2">
+								<area shape="rect" data-org_coords="14,36,198,84" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Window width in pixel</p><p>You can specify a window width here, which affects the size of the coverage plots. Genes with lots of exons can be difficult to inspect when the window width is fixed. Increasing the width magnifies the coverage plot.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="14,90,198,138" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected condition type</p><p>Specifies which type of condition you want to investigate. Remember, you can specify free column names in the <a class=text_link href='./new_project.html#project_file'>project file</a> and each of them servers as condition type (e.g. 'tissue' and 'condition').</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="14,144,198,192" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected gene</p><p>Genes can be selected by entering a gene symbol or gene ID (e.g Ensembl, RegSeq or EntrezGene). Please note that Manananggal internally uses a cross reference table that links different gene identifiers. The cross reference was downloaded from BioMart and should be kept up-to-date.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="5,197,118,215" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected cross reference</p><p>It is necessary to specify which organism is investigated, because this influences the type of cross reference table that is used. Currently, only mouse and human are supported.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="238,36,424,84" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected project</p><p>All files ending in .project in the project folder are listed here.	Selecting a project will add related information to the <font style='color: hsl(240,100%,80%)'>condition type</font> and <font style='color: hsl(240,100%,80%)'>condition</font> dropdown fields.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="238,90,424,138" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected condition type</p><p>The selected condition influences for which condition coverage values shown in the isoform plot (e.g. Manananggal can only show the coverage numbers for brain or lung, but not both together).
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="238,144,424,192" 	data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap2"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected gene annotation</p><p>The selected gene annotation file influences which isoforms will be visualized.	Generally it is best to select the gene annotation that has been used during the generation of splice-junction read counts.
+									<p><a href=# class=refTop>back to top</a></p>">
+							</map>
+							<canvas id="canvas_imgMap2"></canvas>
+						</div>
+					</div>		
+					<div class=textbox id=textbox_imgMap2><a href=# class=refTop>back to top</a></div>		
+				</div>
+			</section>
+			
+			<a class="anchor" id="Options">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Options</h1></header>
+				<div class=mydiv>
+					<p><font style="color: hsl(60, 100%, 70%);">Click on any element</font> to learn more about it.</p>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img id="imgMap3" src="./img/options.png" usemap="#imgMap3">
+							<map name="imgMap3">
+								<area shape="rect" data-org_coords="4,55,252,76" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show unique isoform elements</p><p>Selecting this option highlights unique exon properties as shown (<a class=text_link onclick='lightbox_open(&#34;full_size_unique_isoform_elements&#34;)'>here</a>). Exons that are unique to a certain isoform will be colored in yellow while exons that are unique, but too similar to other exons (e.g. they differ by only a few base pairs) will be shown in orange. </p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="4,77,252,98" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show tissue specificity index</p><p>Meta exons can be colored by their tissue specificity (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity1&#34;);'>example</a>). Exons that are expressed in all tissues will be shown in blue while exons exclusive to certain tissues will be shown in red. Multiple entropy indices can be selected in the advanced options panel. By default, the Gini index will be used to calculate the exclusivity of an exon. Exons for which no coverage information is available are shown in white.</p>
+									<p>Clicking on the colored meta exons opens a popup window that shows the tissue specificity in more detail (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity2&#34;);'>example</a>). This function requires tissue specific data (see file description above) that is not included with Manananggal.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="4,99,252,133" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Colors exons and junctions by expression level</p><p>This option colors exons and junctions by expression based on the currently selected condition (e.g. 'brain' or 'liver'). Darker colors correspond to higher coverages. This is activated by default.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="4,165,252,186" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show relative coverage</p><p>Activating this option and pressing the 'redraw' button displays an alternative representation of the coverage plot (<a class=text_link onclick='lightbox_open(&#34;full_size_relative_coverage_plot&#34;);'>example</a>). Instead of showing absolute coverage profiles, a coverage ratio plot is generated. This representation can be helpful for the identification of coverage changes.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="4,187,252,208" 		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show log2 transformed</p><p>Log transforms coverage (<a class=text_link onclick='lightbox_open(&#34;full_size_log2_coverage_plot&#34;);'>example</a>). The plot will only change after pressing the 'redraw' button.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,38,492,69"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show relevant isoforms only</p><p>Clicking this button removes isoforms that do not fulfill the criteria specified in the advanced options panel. This means isoforms including exons with a too low coverage per base value, too few covered bases or insufficient junction read support will be eliminated (<a class=text_link onclick='lightbox_open(&#34;full_size_isoform_removal&#34;);'>example</a>). At the moment we have implemented a very forgiving removal option that ignores first and last exons of transcripts and accepts exons that are linked by either upstream or downstream junction spanning reads. It is easier to deselect unwanted isoforms manually than selecting isoforms that have been automatically removed and are not shown anymore. </p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,74,492,105"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show GTEX data for gene</p><p>This button opens a popup window that shows the tissue specificity of the currently selected gene (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity3&#34;);'>example</a>). This functions requires tissue specific data that is not included with Manananggal.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,110,492,141"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Calculate MMseq estimates</p><p>Clicking this button will generate isoform expression estimates using <a class=text_link href=https://github.com/eturro/mmseq>MMSEQ</a>. Calculation can take some time, especially if your project includes many samples and the interface will be irresponsive until it receives the results from MMSEQ. After MMSEQ finished, isoform expression estimates will be shown behind each isoform for all conditions (<a class=text_link onclick='lightbox_open(&#34;full_size_mmseq&#34;);'>example</a>). Results will be stored on hard disk and the next time the same gene is visualized Manananggal will automatically add the isoform quantifications without calling MMSeq again. It is necessary to provide a path to MMSeq in the configuration file of Manananggal for this function to work.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,146,492,177"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Save screenshot</p><p>Opens a dialog that prompts the user to select a folder to save a screenshot. The screenshot will only contain the coverage and isoform plots.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,182,492,213"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Show splicing heatmap</p><p>This button opens a popup that shows a heatmap of junction spanning reads (<a class=text_link onclick='lightbox_open(&#34;full_size_junction_heatmap&#34;);'>example</a>).</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,218,492,249"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Reanalyze gene</p><p>Clicking this button generates a new list of potential <a class=text_link href=#>alternative splicing candidates</a> based on the currently selected samples and isoforms.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="259,254,492,285"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Redraw plots</p><p>This button updates the coverage and isoform plots. This is necessary, for example, after switching from the standard coverage plot to the coverage ratio plot or after choosing different samples or isoforms.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="2,248,94,283"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap3"
+									data-textbox_contents="<p style='text-decoration: underline'>Manual</p><p>This button opens this manual.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+							</map>
+							<canvas id="canvas_imgMap3"></canvas>
+						</div>
+					</div>		
+					<div class=textbox id=textbox_imgMap3><a href=# class=refTop>back to top</a></div>
+				</div>
+			</section>
+			
+			<a class="anchor" id="Samples">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Sample selection</h1></header>
+				<div class=mydiv>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/samples.png">
+						</div>
+					</div>
+					<div style="width:100%; display: block;">
+						<p>This window allows you to select or unselect certain samples. In the example are two different conditions (GS689_Li and PC3E) with three samples each (only opened for GS689_Li). After you changed the selection you should <a class=text_link href=#Options>reanalyze</a> the data and <a class=text_link href=#Options>redraw</a> the plots.</p>
+						<p>The buttons at the bottom can be used to unselect all samples at once and to copy &#38; paste a list of sample names to select specific samples.</p>
+						<p>If you have a large number of samples, Manananggal will randomly select a subset for each condition. A popup will inform you if this happens. The selection can still be changed.</p>
+						<p><a href=# class=refTop>back to top</a></p>
+					</div>			
+				</div>
+			</section>
+			
+			<a class="anchor" id="Colors">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Color selection</h1></header>
+				<div class=mydiv>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/colors_1.png">
+						</div>
+					</div>
+					<div style="width:100%; display: block;">
+						<p>Here you can select new colors for each condition if you are unsatisfied with the default colors. To open the color picker, simply click on the colored rectangle next to each condition name. After changing the colors, it is necessary to <a class=text_link href=#Options>redraw</a> the plots to make the changes visible.</p>
+						<p><a href=# class=refTop>back to top</a></p>					
+					</div>			
+				</div>
+			</section>
+			
+			<a class="anchor" id="Isoforms">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Isoform selection</h1></header>
+				<div class=mydiv>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/isoforms.png">
+						</div>
+					</div>
+					<div style="width:100%; display: block;">
+						<p>Here you can change which isoforms are plotted and considered for the detection of alternative splicing events. For example, you might be interested in some particular isoforms only, or you want to unselect apparently unexpressed isoforms to improve the analysis. After changing the isoform selection, it is necessary to <a class=text_link href=#Options>redraw</a> the plots to make the changes visible and to update the alternative splicing candidates you must click on the <a class=text_link href=#Options>reanalyze</a> button.</p>
+						<p>The two buttons at the bottom can be used to unselect all isoforms or to unselect all isoforms with less than x exons.</p>
+						<p><a href=# class=refTop>back to top</a></p>
+					</div>
+				</div>
+			</section>
+			
+			<a class="anchor" id="AdvancedOptions">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Advanced Options</h1></header>				
+				<div class=mydiv>
+					<p><font style="color: hsl(60, 100%, 70%);">Click on any element</font> to learn more about it.</p>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img id="imgMap4" src="./img/advanced_options.png" usemap="#imgMap4">
+							<map name="imgMap4">
+								<area shape="rect" data-org_coords="5,70,215,91"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Attach coverage plot to isoforms</p><p>This option will attach a coverage plot to the isoform plot. This allows you to scroll both plots simultaneously. This can be helpful for very long genes. However, it might be more convenient to keep the coverage plot separately if the gene has many isoforms.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="5,92,215,113"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Show coverage plot grid</p><p>Shows light vertical lines for all y-axis tick marks if enabled.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="5,114,215,135"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Reduce sample size</p><p>Randomly selects the same number of samples per condition up to a total number of 50 samples. This option is enabled automatically if the total number of samples in the project exceeds 50 samples. However, on modern machines even a selection of 200 sample is manageable. Manually changing the sample selection will disable this option again.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="5,136,215,157"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Skipping of first and last exons during automatic isoform removal</p><p>This option is enabled by default and makes Manananggal ignore first and last exons when it decides which isoforms should be discarded 1) when the <a class=text_link href=#Options>Show relevant isoforms only</a> button is clicked and 2) during detection of alternative splicing events.</p>
+									<p>If this option is disabled, also isoforms with insufficient coverage of their terminal exons will be discarded and during alternative splicing detection the first and last exons of the remaining isoforms will also be considered for testing.</p>
+									<p>Even if selected, this option will not prevent detection of alternative terminal exons because first and last exons are explicitly used in this type of analysis.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="5,158,215,179"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Detect intron retention events</p><p>Specifies whether intron retention events should be investigated. This analysis is still experimental and can take a very long time for large data sets. Therefore it is disabled by default for large data sets.</p>
+									<p><a href=# class=refTop>back to top</a></p>">	
+								<area shape="rect" data-org_coords="230,70,445,91"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Show median per condition</p><p>Uses the median coverage per condition to draw the coverage plot.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="230,92,445,127"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Show geometric mean per condition</p><p>Uses the geometric mean of the coverage per condition to draw the coverage plot.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="230,129,445,150"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Show mean per condition</p><p>Uses the mean of the coverage per condition to draw the coverage plot.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="230,151,445,172"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Show quartiles</p><p>Shows the upper (75%) and lower (25%) quartile of the coverage per condition as light shaded area.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="9,196,173,244"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Minimum junction reads</p><p>Defines the minimum number of reads supporting a junction to consider it a valid junction. Isoforms that contain exons that are linked to other exons only by junctions with a coverage below this threshold will be discarded during the automatic isoform removal step.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="9,245,173,293"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Minimum coverage per base</p><p>Defines the minimum coverage per base value for exons to consider them during analysis. Isoforms with exons below this threshold will be considered invalid during the automatic isoform removal step.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="235,196,431,244"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Minimum fraction of covered bases</p><p>Defines how much of an exon must be covered to consider it valid, i.e. a value of 0.7 means that 70% of the bases of an exon must be covered.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="235,245,399,293"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Alternative splicing threshold</p><p>Only alternative splicing results with a change in the coverage ratio greater than this threshold will be reported. A value of 0.05 means that the coverage ratio of the target exon must differ by at least 5% to the average coverage ratio of all other exons. The coverage ratio is defined as cov_condition_A / (cov_condition_A + cov_condition_B).</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+								<area shape="rect" data-org_coords="9,309,173,357"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Selected entropy index</p><p>Different entropy indices (Gini, Simpson, Theil and Shannon) can be selected here. This influences how the tissue specificity of an exon will be calculated (see <a class=text_link href=#Options>Show tissue specificity index</a>). By default the gini index is selected.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+							
+								<area shape="rect" data-org_coords="8,393,436,468"		data-color_highlight="rgba(0,0,255,0.2)" data-textbox="textbox_imgMap4"
+									data-textbox_contents="<p style='text-decoration: underline'>Generate HTML link for current view</p><p>Hitting the button generates a HTML link that includes information on which project, gene and isoforms are selected. You can add '&#38;screenshot' to the link to request a screenshot. Instead of having to process all the data, Manananggal will load (or create, if the link was clicked for the first time) a screenshot.</p>
+									<p><a href=# class=refTop>back to top</a></p>">
+							</map>
+							<canvas id="canvas_imgMap4"></canvas>
+						</div>
+					</div>
+					<div class=textbox id=textbox_imgMap4><a href=# class=refTop>back to top</a></div>					
+				</div>
+			</section>
+
+			<a class="anchor" id="Results">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Result list</h1></header>
+				<div class=mydiv>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/results_1.png">
+						</div>
+					</div>
+
+					<div style="display: block; clear: both; padding-top: 10px;">
+
+						<p style="margin-bottom:30px;">The result list is split into two tabs. The first tab (see image) shows the curated list of results and the second tab (hidden) shows the list of temporary results. The temporary results list the detected alternative splicing events for the currently selected samples, isoforms and parameter set. Results from the temporary list can be selected and transferred to the curated list of results.</p>
+						<p style="margin-bottom:20px;"><img src="../img/red_cross.png" style="display: inline; top: 4px; width: 20px; height: 20px;"> removes a result from the curated list.</p>
+						<p style="margin-bottom:20px;"><img src="../img/view.png" style="background:#ffffff; padding: 3px; display: inline; top: 2px; width: 22px; height: 12px;"> shows the associated gene and selects only isoforms relevant to the splicing event. Further, relevant elements (exons, introns) will be colored in red and other elements in white (<a class=text_link onclick='lightbox_open(&#34;full_size_results2&#34;);'>example</a>).</p>
+						<p style="margin-bottom:20px;"><img src="../img/magnifier_blue.png" style="background:#ffffff; padding: 3px; display: inline; top: 8px; width: 24px; height: 20px;"> opens a popup that shows a more detailed view of the splicing event and gives additional information on the junction read coverage (<a class=text_link onclick='lightbox_open(&#34;full_size_results3&#34;);'>example</a>).</p>
+						<p style="margin-bottom:30px;"><img src="../img/detailed_desc.png" style="background:#ffffff; padding: 3px; display: inline; top: 8px; width: 18px; height: 20px;"> opens a popup with some information about the splicing event in table format, a boxplots for the coverage ratio of the target exon compared to the remaining exons and the junction box plots also shown using the magnifying glass.</p>
+						<p>For each symbol there is a also a red colored version that indicates that at least one junction relevant to the event does not belong to any annotated isoform. Each result can be rated on a five star scale. Clicking on a star for a second time clears the rating again. The last column in this window is a free text column that can be used to enter comments. After adding temporary results to the list if curated results, removing results or changing ratings it is necessary to click on the "save changes" button to make changes permanent.</p>
+						<p><a href=# class=refTop>back to top</a></p>
+					</div>
+				</div>
+			</section>
+			
+			<a class="anchor" id="Coverage">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Coverage plot</h1></header>
+				<div class=mydiv>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/coverage_plot.png">
+						</div>
+					</div>
+					<div style="display: inline-block; clear: both; padding-top: 10px;">
+						<p style="margin-bottom:30px;">The coverage plot shows the coverage per base values for each exonic position. You can influence the resolution of the plot by changing the <a class=text_link href=#Settings>window width</a>. Appearance of the plot can be influenced by selecting different representations (coverage ratio plot, log2 transformed values) in the <a class=text_link href=#Options>options</a> menu or selecting different modes for the displayed coverage (median, geometric mean, mean) in the <a class=text_link href=#AdvancedOptions>advanced options menu</a></p>
+						<p>Clicking on the coverage track opens a popup window that shows each sample group as single track, which can be helpful if you are comparing a large number of groups (<a class=text_link onclick='lightbox_open(&#34;full_size_multiple_coverage_tracks&#34;);'>example</a>)</p>
+						<p><a href=# class=refTop>back to top</a></p>
+					</div>
+				</div>
+			</section>
+
+			
+			<a class="anchor" id="IsoformPlot">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>Isoform plot</h1></header>
+				<div class=mydiv>
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/isoform_plot.png">
+						</div>
+					</div>
+					<div style="display: block; clear: both; padding-top: 10px;">
+						<p>The isoform plot shows, in order from top to bottom, exonic (red) and intronic (orange, not shown) regions of overlapping antisense transcripts, exonic (dark blue) and intronic (light blue) regions of overlapping transcripts in sense orientation, all meta exons and all currently selected isoforms. Potential exon skipping events are highlighted on the meta exon track (red meta exon).</p>
+						<p>Single isoforms can be unselected by clicking on the red cross next to the isoform name.</p>
+						<p style="margin-bottom:30px;">The average coverage values for junctions (blue numbers) and exon (black numbers) for the currently selected condition (in this case GS689_Li) are shown below and above the isoforms. Changing the currently selected condition in the <a class=text_link href=#Settings>settings menu</a> updates these numbers automatically.</p>
+						<p><a href=# class=refTop>back to top</a></p>
+					</div>
+				</div>
+			</section>
+			
+			<a class="anchor" id="NewFeatures">&nbsp;</a>
+			<section class=mysection>
+				<header><h1>New Features</h1></header>
+				<div class=mydiv>
+					<div style="display: block; clear: both; padding-top: 10px;">
+						<p>Coverage plots can now be clicked to open a popup window that shows a single coverage plot for each selected condition</p>
+					</div>				
+					<div class="outer_img_wrapper">
+	    				<div class="inner_img_wrapper">
+							<img src="./img/NewFeature_CoveragePlot.png">
+						</div>
+					</div>
+					
+					<div style="display: block; clear: both; padding-top: 10px;">
+						<p>Junctions in the isoform view can now be clicked to open boxplots showing the junction coverage.</p>					
+					</div>
+					<div class="outer_img_wrapper">
+    					<div class="inner_img_wrapper">
+							<img src="./img/NewFeature_BoxPlotJunCoverage.png">
+						</div>
+					</div>
+				
+					<div style="display: block; clear: both; padding-top: 10px;">
+						<p>Added an import tab for the import of alternative splicing result files from various tools.</p>					
+					</div>
+					<div class="outer_img_wrapper">
+    					<div class="inner_img_wrapper">
+							<img src="./img/NewFeature_Import.png">
+						</div>
+					</div>
+					
+					<div style="display: block; clear: both; padding-top: 10px;">
+						<p>Added an option to save the current color scheme for each condition type.</p>					
+					</div>
+					<div class="outer_img_wrapper">
+    					<div class="inner_img_wrapper">
+							<img src="./img/NewFeature_SaveColor.png">
+						</div>
+					</div>
+					
+				</div>
+				<p><a href=# class=refTop>back to top</a></p>
+			</section>
+			
+		</div>
+
+		<script src="./script/jquery-1.12.3.min.js"></script>
+		<script src="http://jquery-imagefit-plugin.googlecode.com/svn/trunk/jquery.imagefit-0.2.js"></script>
+		
+		<!-- resize image map -->
+		<script src="./script/imageMapResizer.min.js"></script>
+		<script type="text/javascript">
+			
+			// resize image map areas according to image size
+			$('map').ResizeImageMap();
+			
+			function init()
+			{
+				// add mouse over events to image map areas
+				$('map').Highlight();
+
+				// check if IE
+				var ua = window.navigator.userAgent;
+			    var msie = ua.indexOf("MSIE ");
+			
+				// we need to propagate the mouse events from the canvas to the image map in IE10 and below
+			    if(msie > 0)
+			    {
+					var canvases = document.querySelectorAll('canvas');
+
+					for(var i=0; i<canvases.length; i++)
+					{
+						$(canvases[i]).mousemove(function(event)
+						{
+							$(this).hide();
+							var lowerLayerElement = document.elementFromPoint(event.clientX, event.clientY);
+							$(this).show();
+							
+							$(lowerLayerElement).mouseover(); // Manually fire the event for desired underlying element
+						});
+						
+						$(canvases[i]).click(function(event)
+						{
+							$(this).hide();
+							var lowerLayerElement = document.elementFromPoint(event.clientX, event.clientY);
+							$(this).show();
+							
+							$(lowerLayerElement).click(); // Manually fire the event for desired underlying element
+						});
+					}
+				}
+			}
+		
+			// highlight image map areas on mouse over
+			window.onload = function()
+			{
+				init();
+			}
+			
+			$(document).ready(init)
+			$(document).on('page:load', init)
+			
+			document.onload = function()
+			{
+				init();
+			}
+		
+			// close lightbox if on key down
+			window.document.onkeydown = function (e)
+			{
+			    if (!e)
+			    {
+			        e = event;
+			    }
+			    if (e.keyCode == 27)
+			    {
+			        lightbox_close();
+			    }
+			}
+			
+			function lightbox_open(targetID)
+			{
+				var divLight  = document.querySelector('#' + targetID);
+				var divFade   = document.querySelector('#fade');
+				
+				// show the light box and fade effect
+				$(divLight).css("display","inline-block");
+				$(divFade ).css("display","inline-block");
+				
+				var figure = $(divLight).children().filter('figure');
+				var image  = $(divLight).children().filter('img');
+		    	
+		    	// get window dimensions
+				var winHeight = window.innerHeight ||
+					document.documentElement.clientHeight ||
+					document.body.clientHeight ||
+					document.body.offsetHeight;
+				
+				var winWidth = window.innerWidth ||
+					document.documentElement.clientWidth ||
+					document.body.clientWidth ||
+					document.body.offsetWidth;
+				
+				
+				/*
+				var newHeight = Math.min($(image).height(), winHeight*0.8);
+		    	var newWidth  = Math.min($(image).width(), 	winWidth*0.8);
+		    	*/
+		    	
+		    	var requiresScrollbarX = false;
+		    	var requiresScrollbarY = false;
+		    	
+		    	var figureHeight = $(figure).height();
+		    	var figureWidth  = $(figure).width();
+		    	
+		    	if(figureHeight > winHeight*0.8)
+		    	{
+		    		requiresScrollbarY = true;
+		    		figureWidth += 17;
+		    	}
+
+		    	if(figureWidth > winWidth*0.8)
+		    	{
+		    		requiresScrollbarX = true;
+		    		figureHeight += 17;
+		    	}
+		    	
+		    	var newHeight = Math.min(figureHeight, 	winHeight*0.8);
+		    	var newWidth  = Math.min(figureWidth, 	winWidth*0.8);
+		    	
+		    	// show scroll bars if the image is too large
+		    	if(!requiresScrollbarY)
+		    	{
+		    		$(divLight).css({'overflow-y': 'hidden'});
+		    	}
+		    	else
+		    	{
+		    		$(divLight).css({'overflow-y': 'scroll'});
+		    	}
+		    	
+		    	if(!requiresScrollbarX)
+		    	{
+		    		$(divLight).css({'overflow-x': 'hidden'});
+		    	}
+		    	else
+		    	{
+		    		$(divLight).css({'overflow-x': 'scroll'});
+		    	}
+		    	
+										    	
+		    	var newTop    = (winHeight * 0.5) - newHeight * 0.5;
+		    	var newLeft   = (winWidth  * 0.5) - newWidth * 0.5;
+		    	
+		    	$(divLight).css("height",  	newHeight);
+		    	$(divLight).css("width", 	newWidth);
+		    	$(divLight).css("top",  	newTop);
+		    	$(divLight).css("left", 	newLeft);
+		    	
+		    	$(image).css("height",  newHeight);
+		    	$(image).css("width", 	newWidth);
+		    	
+		    	/*
+		    	console.log("win: " + winWidth + " " + winHeight);
+		    	console.log("new: " + newWidth + " " + newHeight);
+		    	console.log("pos: " + newLeft + " " + newTop);
+		    	*/
+			}
+			
+			function lightbox_close()
+			{
+				var lightBoxes = $(".light");
+				for(var i=0; i<lightBoxes.length; i++)
+				{
+					lightBoxes[i].style.display = 'none';
+				}
+
+		    	document.getElementById('fade').style.display								= 'none';
+		    	document.getElementById('fade').style.zindex								= 'none';
+		    }
+		</script>
+	</body>
+</html>

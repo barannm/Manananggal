@@ -1,0 +1,553 @@
+<head>
+<link rel="stylesheet" type="text/css" href="./css/manual.css">
+</head>
+
+<body>
+	<div class="title_div">
+	<h1 class="title">Manananggal – Userguide</h1>
+	
+	<div class=light id="full_size_specificity1">
+			<figure>
+				<img src='./img/tissue_specificity_1.png' style="width: 960px; height:304px;">
+				<figcaption>
+					<p style="margin-bottom: 0px;">Exon specificity is shown by a color gradient on the meta exon track (red=specific, blue=unspecific).</p>
+					<p style="margin-top: 5px;">Numbers above the meta exons correspond to the specificity (1 = very specific)</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_specificity2">
+			<figure>
+				<img src='./img/tissue_specificity_2.png' style="width: 1291px; height:456px;">
+				<figcaption>
+					<p>This example shows the tissue specific expression of a red colored exon with specificity index of 0.75. Apparently, these exons are only expressed in brain tissues (category 8 to 20).</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=light id="full_size_specificity3">
+			<figure>
+				<img src='./img/tissue_specificity_3.png' style="width: 1291px; height:456px;">
+				<figcaption>
+					<p>This graphs shows how tissue specific the expression of the currently selected gene is. Apparently, the gene is mostly expressed in a leukemia cell line (22) and liver (34).</p>
+				</figcaption>
+			</figure>
+		</div>
+		
+		<div class=fade id="fade" onClick="lightbox_close();"></div>
+
+	<!-- SECTIONS -->
+	<nav class="nav_effect">
+		<ul>
+			<li>
+				<a href="./installation.html">Installation</a>
+				<ul>
+				<li><a href="./installation.html#console_app">Installing the console application</a></li>
+				<li><a href="./installation.html#web_app">Installing the web application</a></li>
+				<li><a href="./installation.html#crossref">Cross-reference file</a></li>
+				<li><a href="./installation.html#counts_tissue_gene">Tissue specific gene expression</a></li>
+				<li><a href="./installation.html#counts_tissue_exon">Tissue specific exon expression</a></li>			
+				</ul>
+			</li>
+			<li>
+				<a href="./new_project.html">Adding projects</a>
+				<ul>
+					<li><a href="./new_project.html#requirements">Requirements</a></li>
+					<li><a href="./new_project.html#bigwig">Generation of BigWig files</a></li>
+					<li><a href="./new_project.html#count_files">Generation of count files</a></li>
+					<li><a href="./new_project.html#project_file">Preparing the project file</a></li>
+					<li><a href="./new_project.html#merging">Merging junction count files</a></li>
+				</ul>
+			</li>
+			<li>
+				<a href="./console_application.html">The console app</a>
+				<ul>
+					<li><a href="./console_application.html#running">Running the Console Application</a></li>
+					<li><a href="./console_application.html#output">Output Format</a></li>						
+				</ul>
+			</li>
+			<li><a href="./viewer.html">The viewer</a>
+				<ul>
+					<li><a href="./viewer.html#Overview">Overview</a></li>
+					<li><a href="./viewer.html#Settings">Settings Menu</a></li>
+					<li><a href="./viewer.html#Options">Option Menu</a></li>
+					<li><a href="./viewer.html#Samples">Sample Selection</a></li>
+					<li><a href="./viewer.html#Colors">Sample Colors</a></li>
+					<li><a href="./viewer.html#Isoforms">Isoform Selection</a></li>
+					<li><a href="./viewer.html#AdvancedOptions">Advanced Options Menu</a></li>
+					<li><a href="./viewer.html#Results">Results Window</a></li>
+					<li><a href="./viewer.html#Coverage">Coverage Plot</a></li>
+					<li><a href="./viewer.html#IsoformPlot">Isoform Plot</a></li>
+				</ul>
+			</li>
+			<li><a href="./interpreting_results.html">Interpreting results</a></li>
+			<li><a href="./tutorial.html">Tutorial</a>
+			  <ul>
+			  	<li><a href="./tutorial.html#preamble">Preamble</a></li>
+			  	<li><a href="./tutorial.html#data_selection">Data Loading</a></li>
+				<li><a href="./tutorial.html#isoform_selection">Isoform Choice</a></li>
+				<li><a href="./tutorial.html#result_list">Result List</a></li>
+				<li><a href="./tutorial.html#alt_start">Example 2</a></li>
+				<li><a href="./tutorial.html#exon_extension">Example 3</a></li>
+			  </ul>
+			</li>
+		</ul>
+	</nav>
+	</div>
+    	
+	<div class="content_div">
+		
+		<a class="anchor" id="console_app">&nbsp;</a>
+		<section class=mysection>
+		  <header><h1>Installation of the Console Application</h1></header>
+		  <div class=mydiv>
+			<p>The console application does not require installation. You are free to put the jar file wherever you see fit.</p>
+		  </div>
+		</section>
+
+		<a class="anchor" id="web_app">&nbsp;</a>
+		<section class=mysection>
+		<header><h1>Installation of the Web Application</h1></header>
+		<div class=mydiv>
+			<p>To run the Manananggal Web Application you need a working server (e.g. an <a class="text_link" href="http://tomcat.apache.org/">Apache Tomcat server</a>).</p>
+			<p>Next, put the <font style="color: hsl(100,100%,50%)">Manananggal.war</font> file into the <font style="color: hsl(240,100%,80%)">/webapps</font> folder of your server (or any folder that your server searches for .war files).</p>
+			<p>You need to specify where Manananggal should search for projects and gene annotations. Therefore, create a <font style="color: hsl(100,100%,50%)">app_paths.config</font> file with the following information in the <font style="color: hsl(240,100%,80%)">/home</font> directory of the server user. You can change this path by setting the environmental variable MANANANGGAL_CONFIG (e.g.: export MANANANGGAL_CONFIG=/my_folder/app_paths.config)</p>
+	
+			<h2>Contents of the <font style="color: hsl(100,100%,50%)">app_paths.config</font>:</h2>
+			<div class=table>
+				<div class="row header">
+					<div class=cell>Setting</div>
+					<div class=cell>What does it do?</div>
+					<div class=cell>Example</div>
+				</div>
+				<div class=row>
+					<div class=cell>path_references</div>
+					<div class=cell>Specifies the location of gene annotation files (.GTF)</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_references="/Manananggal/references"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_projects</div>
+					<div class=cell>Specifies where the location of .project files</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_projects="/Manananggal/projects"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_GTEX_exon_IDs<sup>&#10008;</sup></div>
+					<div class=cell>Points to the flattened GTF file that was used to generate tissue specific exon counts</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_GTEX_exon_IDs= "/Manananggal/references/flattened_transcripts.gtf"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_GTEX_gene_counts<sup>&#10008;</sup></div>
+					<div class=cell>Specifies the location of all tissue specific gene counts (see below)</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_GTEX_gene_counts="/GTEX_data/gene_counts"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_GTEX_exon_counts<sup>&#10008;</sup></div>
+					<div class=cell>Specifies the location of all tissue specific exon counts (see below)</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_GTEX_exon_counts="/GTEX_data/exon_counts"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_tmp</div>
+					<div class=cell>Specifies the location for temporary output files</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_tmp="/Manananggal/tmp"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_MMSEQ_results<sup>&#10008;</sup></div>
+					<div class=cell>Specifies the location where MMSeq results will be stored</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_MMSEQ_results="/Manananggal/mmseq_estimates"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>num_threads</div>
+					<div class=cell>Specifies the number of threads that Manananggal may use</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">num_threads=8</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_hits</div>
+					<div class=cell>Specifies the location of saved alternative splicing results</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_hits="/Manananggal/results"</font></div>
+				</div>
+				<div class=row>
+					<div class=cell>path_MMSEQ_executable<sup>&#10008;</sup></div>
+					<div class=cell>Specifies the location of the MMSeq executable</div>
+					<div class=cell><font style="font-size: 14px; font-family: 'Courier',sans-serif;">path_MMSEQ_executable="/software/mmseq/mmseq-1.0.8-Linux"</font></div>
+				</div>		
+			</div>
+			<div style="margin-left:20px;"><font style="font-size: 14px; font-weight: 500; text-shadow:none;">Elements tagged with &#10008; are optional and can be set to empty quotes ""</font></div>
+		</div>
+		</section>
+		
+		<a class="anchor" id="crossref">&nbsp;</a>
+		<section class=mysection>
+		<header><h1>Cross reference file</h1></header>
+		<div class=mydiv>
+			<p>It is more intuitively to search genes by gene symbol than by gene IDs provided by Ensembl, EntrezGene or RefSeq. Therefore it is necessary to tell
+			Manananggal which gene symbol belongs to which ID. Because mouse and human gene symbols differ it is necessary to specify one cross-reference for each
+			of them. Manananggal automatically searches for a <font style="color: hsl(100,100%,50%)">biomart_cross_ref_human.txt</font> and <font style="color: hsl(100,100%,50%)">
+			biomart_cross_ref_mouse.txt</font> in the reference folder specified in the <font style="color: hsl(100,100%,50%)">app_paths.config</font>.
+			The following table describes the format of the cross-reference file that is used.</p>
+
+			<h2>Contents of the cross-reference files:</h2>
+			<div class=table>
+				<div class="row header">
+					<div class=cell>EnsemblGeneID</div>
+					<div class=cell>EnsemblTranscriptID</div>
+					<div class=cell>RefSeqID</div>
+					<div class=cell>EntrezGeneID</div>
+					<div class=cell>GeneSymbol</div>
+					<div class=cell>FullName</div>
+					<div class=cell>Aliases</div>
+				</div>
+				<div class=row>
+					<div class=cell>ENSG00000180096</div>
+					<div class=cell>ENST00000321367</div>
+					<div class=cell>NM_052838</div>
+					<div class=cell>1731</div>
+					<div class=cell>SEPT1</div>
+					<div class=cell>"septin 1"</div>
+					<div class=cell>PNUTL3</div>
+				</div>
+				<div class=row>
+					<div class=cell>ENSG00000180096</div>
+					<div class=cell>ENST00000563957</div>
+					<div class=cell></div>
+					<div class=cell>1731</div>
+					<div class=cell>SEPT1</div>
+					<div class=cell>"septin 1"</div>
+					<div class=cell>PNUTL3</div>
+				</div>
+				<div class=row>
+					<div class=cell>ENSG00000180096</div>
+					<div class=cell>ENST00000572252</div>
+					<div class=cell></div>
+					<div class=cell>1731</div>
+					<div class=cell>SEPT1</div>
+					<div class=cell>"septin 1"</div>
+					<div class=cell>PNUTL3</div>
+				</div>
+				<div class=row>
+					<div class=cell>ENSG00000168385</div>
+					<div class=cell>ENST00000402092</div>
+					<div class=cell>NM_001008492</div>
+					<div class=cell>4735</div>
+					<div class=cell>SEPT2</div>
+					<div class=cell>"septin 2"</div>
+					<div class=cell>KIAA0158, hNedd5, Pnutl3</div>
+				</div>
+				<div class=row>
+					<div class=cell>ENSG00000168385</div>
+					<div class=cell>ENST00000420786</div>
+					<div class=cell></div>
+					<div class=cell>4735</div>
+					<div class=cell>SEPT2</div>
+					<div class=cell>"septin 2"</div>
+					<div class=cell>KIAA0158, hNedd5, Pnutl3</div>
+				</div>
+			</div>
+			<p>There are several ways to get the information needed for the cross-reference file. Probably the easiest is to query biomart via R. Below is an example script showing how this can be done.
+			</p>
+			<div class=div_code>
+			<p><font style="color: hsl(260, 100%, 50%);">library</font>(biomaRt)</p>
+			<p>ensembl=useMart("ensembl", dataset="hsapiens_gene_ensembl")</p>
+			<br>
+			<p class=comment># you might optionally also want to include "refseq_mrna_predicted", "refseq_ncrna" and merge them with the refseq_mrna column</p>
+			<p>bm &lt;- getBM(attributes=c(<font style="color: hsl(0, 0%, 70%);">"ensembl_gene_id"</font>, <font style="color: hsl(0, 0%, 70%);">"ensembl_transcript_id"</font>, <font style="color: hsl(0, 0%, 70%);">"refseq_mrna"</font>, <font style="color: hsl(0, 0%, 70%);">"entrezgene"</font>, <font style="color: hsl(0, 0%, 70%);">"hgnc_symbol"</font>, <font style="color: hsl(0, 0%, 70%);">"description"</font>), mart = ensembl)</p>
+			<br>
+			<p class=comment># [optionally] add synonyms</p>
+			<p>hgnc &lt;- read.delim(url(<a href="http://www.genenames.org/cgi-bin/hgnc_downloads.cgi?title=HGNC+output+data&hgnc_dbtag=on&col=gd_app_sym&col=gd_aliases&status=Approved&status=Entry+Withdrawn&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&submit=submit&.cgifields=&.cgifields=chr&.cgifields=status&.cgifields=hgnc_dbtag">http://www.genenames.org/cgi-bin/hgnc_dow..</a>))</p>
+			<p>mtch &lt;- match(bm$hgnc_symbol, hgnc[,1])</p>
+			<p>bm$synonyms = hgnc[mtch,2]</p>
+			<br>
+			<p class=comment># write as tab-separated file</p>
+			<p>write.table(bm, <font style="color: hsl(0, 0%, 70%);">"biomart_cross_ref_human.txt"</font>, row.names=<font style="color: hsl(260, 100%, 50%);">FALSE</font>, quote=<font style="color: hsl(260, 100%, 50%);">FALSE</font>, sep="\t")</p>
+			</div>
+			<p>Alternatively, you can query <a class=text_link href=http://www.genenames.org/cgi-bin/download>genenames.org</a> or <a class=text_link href=http://www.ensembl.org/biomart/martview>biomart</a> in your web browser.
+			Further, Your gene annotation file might include more identifiers than provided by biomart (e.g. if you use Gencode). Therefore you might want to extract the gene_id, transcript_id and gene_symbol attributes
+			from your GTF file and add them manually to the cross reference. Genes without gene symbols can only be querried via Ensembl gene identifiers, which should also work for organisms other than mouse and human.</p>
+		</div>
+		
+		</section>
+		
+		<a class="anchor" id="counts_tissue_gene">&nbsp;</a>
+		<section class=mysection>
+		  <header><h1>Tissue specific gene expression files [Optional]</h1></header>
+		  <div class=mydiv>
+		  	<p>It might be interesting to know whether the gene (or one of its exons) you are looking at has a tissue specific expression. If you have access to such data, Manananggal provides an interface to draw boxplots for the tissue specificity of the gene (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity3&#34;);'>example</a>) and exon (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity2&#34;);'>example</a>) level. Further, tissue specific exon expression can also be indicated on the meta exon track (<a class=text_link onclick='lightbox_open(&#34;full_size_specificity1&#34;);'>example</a>).</p>
+			<p>Currently, tissue specific gene expression must be in the format given below. For each gene there must be one file called <font style="color: hsl(100,100%,50%)">GTEX_[EntrezGeneID].tsv</font>. If multiple tissues are available for the same organ you can denote them as "organ - tissue". Manananggal will group the tissues based on organs but draws one bar per tissue.</p>
+			<div class=table>
+				<div class="row header">
+					<div class=cell>NAME</div>
+					<div class=cell>TISSUENAME</div>
+					<div class=cell>EXPRESSION</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR12345</div>
+					<div class=cell>Artery – Coronary</div>
+					<div class=cell>3.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR14567</div>
+					<div class=cell>Artery – Coronary</div>
+					<div class=cell>0.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR13456</div>
+					<div class=cell>Spleen</div>
+					<div class=cell>5.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR13457</div>
+					<div class=cell>Spleen</div>
+					<div class=cell>5.1</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR13458</div>
+					<div class=cell>Spleen</div>
+					<div class=cell>5.4</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR15678</div>
+					<div class=cell>Brain – Hypothalamus</div>
+					<div class=cell>3.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR15679</div>
+					<div class=cell>Brain – Hypothalamus</div>
+					<div class=cell>3.2</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR16789</div>
+					<div class=cell>Brain – Amygdala</div>
+					<div class=cell>2.9</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR16789</div>
+					<div class=cell>Brain – Amygdala</div>
+					<div class=cell>2.8</div>
+				</div>
+			</div>
+		  </div>
+		</section>
+		
+		<a class="anchor" id="counts_tissue_exon">&nbsp;</a>
+		<section class=mysection>
+		  <header><h1>Tissue specific exon expression files [Optional]</h1></header>
+		  <div class=mydiv>
+			<p>In principle this is the same format that is used for gene counts. However, file names must include the exonID in the file name: <font style="color: hsl(100,100%,50%)">GTEX_[EntrezGeneID]_[ExonID].tsv</font>. The exonID must match the exon IDs in the flattened reference file.</p>
+			<div class=table>
+				<div class="row header">
+					<div class=cell>NAME</div>
+					<div class=cell>TISSUE</div>
+					<div class=cell>EXPRESSION</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR12345</div>
+					<div class=cell>Artery – Coronary</div>
+					<div class=cell>3.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR14567</div>
+					<div class=cell>Artery – Coronary</div>
+					<div class=cell>0.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR13456</div>
+					<div class=cell>Spleen</div>
+					<div class=cell>5.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR13457</div>
+					<div class=cell>Spleen</div>
+					<div class=cell>5.1</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR13458</div>
+					<div class=cell>Spleen</div>
+					<div class=cell>5.4</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR15678</div>
+					<div class=cell>Brain – Hypothalamus</div>
+					<div class=cell>3.0</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR15679</div>
+					<div class=cell>Brain – Hypothalamus</div>
+					<div class=cell>3.2</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR16789</div>
+					<div class=cell>Brain – Amygdala</div>
+					<div class=cell>2.9</div>
+				</div>
+				<div class=row>
+					<div class=cell>SRR16789</div>
+					<div class=cell>Brain – Amygdala</div>
+					<div class=cell>2.8</div>
+				</div>
+			</div>
+			<div style="margin-left:20px;"><font style="font-size: 14px; font-weight: 500; text-shadow:none;">Please note that this type of format may change in the future because having one file per exon is a bit messy.</font></div>		
+		  </div>
+		</section>
+	</div>
+  
+  <script src="./script/jquery-1.12.3.min.js"></script>
+		<script src="http://jquery-imagefit-plugin.googlecode.com/svn/trunk/jquery.imagefit-0.2.js"></script>
+		
+		<!-- resize image map -->
+		<script src="./script/imageMapResizer.min.js"></script>
+		<script type="text/javascript">
+			
+			// resize image map areas according to image size
+			$('map').ResizeImageMap();
+		
+			// highlight image map areas on mouse over
+			window.onload = function()
+			{
+				// add mouse over events to image map areas
+				$('map').Highlight();
+
+				// check if IE
+				var ua = window.navigator.userAgent;
+			    var msie = ua.indexOf("MSIE ");
+			
+				// we need to propagate the mouse events from the canvas to the image map in IE10 and below
+			    if(msie > 0)
+			    {
+					var canvases = document.querySelectorAll('canvas');
+
+					for(var i=0; i<canvases.length; i++)
+					{
+						$(canvases[i]).mousemove(function(event)
+						{
+							$(this).hide();
+							var lowerLayerElement = document.elementFromPoint(event.clientX, event.clientY);
+							$(this).show();
+							
+							$(lowerLayerElement).mouseover(); // Manually fire the event for desired underlying element
+						});
+						
+						$(canvases[i]).click(function(event)
+						{
+							$(this).hide();
+							var lowerLayerElement = document.elementFromPoint(event.clientX, event.clientY);
+							$(this).show();
+							
+							$(lowerLayerElement).click(); // Manually fire the event for desired underlying element
+						});
+					}
+				}
+			}
+		
+			// close lightbox if on key down
+			window.document.onkeydown = function (e)
+			{
+			    if (!e)
+			    {
+			        e = event;
+			    }
+			    if (e.keyCode == 27)
+			    {
+			        lightbox_close();
+			    }
+			}
+			
+			function lightbox_open(targetID)
+			{
+				var divLight  = document.querySelector('#' + targetID);
+				var divFade   = document.querySelector('#fade');
+				
+				// show the light box and fade effect
+				$(divLight).css("display","inline-block");
+				$(divFade ).css("display","inline-block");
+				
+				var figure = $(divLight).children().filter('figure');
+				var image  = $(divLight).children().filter('img');
+		    	
+		    	// get window dimensions
+				var winHeight = window.innerHeight ||
+					document.documentElement.clientHeight ||
+					document.body.clientHeight ||
+					document.body.offsetHeight;
+				
+				var winWidth = window.innerWidth ||
+					document.documentElement.clientWidth ||
+					document.body.clientWidth ||
+					document.body.offsetWidth;
+				
+				
+				/*
+				var newHeight = Math.min($(image).height(), winHeight*0.8);
+		    	var newWidth  = Math.min($(image).width(), 	winWidth*0.8);
+		    	*/
+		    	
+		    	var requiresScrollbarX = false;
+		    	var requiresScrollbarY = false;
+		    	
+		    	var figureHeight = $(figure).height();
+		    	var figureWidth  = $(figure).width();
+		    	
+		    	if(figureHeight > winHeight*0.8)
+		    	{
+		    		requiresScrollbarY = true;
+		    		figureWidth += 17;
+		    	}
+
+		    	if(figureWidth > winWidth*0.8)
+		    	{
+		    		requiresScrollbarX = true;
+		    		figureHeight += 17;
+		    	}
+		    	
+		    	var newHeight = Math.min(figureHeight, 	winHeight*0.8);
+		    	var newWidth  = Math.min(figureWidth, 	winWidth*0.8);
+		    	
+		    	// show scroll bars if the image is too large
+		    	if(!requiresScrollbarY)
+		    	{
+		    		$(divLight).css({'overflow-y': 'hidden'});
+		    	}
+		    	else
+		    	{
+		    		$(divLight).css({'overflow-y': 'scroll'});
+		    	}
+		    	
+		    	if(!requiresScrollbarX)
+		    	{
+		    		$(divLight).css({'overflow-x': 'hidden'});
+		    	}
+		    	else
+		    	{
+		    		$(divLight).css({'overflow-x': 'scroll'});
+		    	}
+		    	
+										    	
+		    	var newTop    = (winHeight * 0.5) - newHeight * 0.5;
+		    	var newLeft   = (winWidth  * 0.5) - newWidth * 0.5;
+		    	
+		    	$(divLight).css("height",  	newHeight);
+		    	$(divLight).css("width", 	newWidth);
+		    	$(divLight).css("top",  	newTop);
+		    	$(divLight).css("left", 	newLeft);
+		    	
+		    	$(image).css("height",  newHeight);
+		    	$(image).css("width", 	newWidth);
+		    	
+		    	/*
+		    	console.log("win: " + winWidth + " " + winHeight);
+		    	console.log("new: " + newWidth + " " + newHeight);
+		    	console.log("pos: " + newLeft + " " + newTop);
+		    	*/
+			}
+			
+			function lightbox_close()
+			{
+				var lightBoxes = $(".light");
+				for(var i=0; i<lightBoxes.length; i++)
+				{
+					lightBoxes[i].style.display = 'none';
+				}
+
+		    	document.getElementById('fade').style.display								= 'none';
+		    	document.getElementById('fade').style.zindex								= 'none';
+		    }
+		</script>
+</body>

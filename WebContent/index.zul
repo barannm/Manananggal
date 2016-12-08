@@ -1,0 +1,63 @@
+<?link rel="stylesheet" type="text/css" href="/css/mycss.css"?>
+<zk>
+  	<window use="Manananggal.SplicingWebApp">
+  	<timer id="timerKeepAliveSession" repeats="true" delay="30000"/>
+  	</window>
+
+
+	<script>
+		
+		<![CDATA[
+		function scrollCoverage()
+		{
+			var scrollValue = jq('$CoveragePlot').scrollLeft();
+			jq('$IsoformPlot').scrollLeft(scrollValue);
+		}
+		
+		function scrollIsoforms()
+		{
+			var scrollValue = jq('$IsoformPlot').scrollLeft();
+			jq('$CoveragePlot').scrollLeft(scrollValue);
+		}
+		         
+		zk.afterMount(function ()
+		{			
+			var cov_plot = jq('$CoveragePlot');
+			cov_plot.scroll(scrollCoverage);
+			
+			var cov_plot = jq('$IsoformPlot');
+			cov_plot.scroll(scrollIsoforms);
+			
+			var uploadDlg = jq('$upldDlg');
+			uploadDlg.hide();
+		});
+		]]>
+	</script>
+	
+	<script defer="true">
+		var oldMessage = jq.alert;
+		jq.alert = function(msg, opts)
+		{
+			if(!msg.indexOf('the request was rejected because its size') || !msg.indexOf('The request was rejected because the file size'))
+			{
+				// get original number
+				var splt = msg.split(" ");
+				var fileSize = splt[7];
+				var maxSize = splt[12];
+				
+				// remove brackets
+				fileSize = fileSize.slice(1, fileSize.length - 1);
+				maxSize  =  maxSize.slice(1, maxSize.length  - 1);
+				
+				// get size in MB
+				fileSize = (parseInt(fileSize)/1024/ 1024).toFixed(2) + ' MB';
+				maxSize  = (parseInt(maxSize )/1024/ 1024).toFixed(2) + ' MB';
+
+				// set error message
+				zk.Widget.$('$labError').setValue("File size (" + fileSize + ") exceeds maximum allowed file size (" + maxSize + "). You may use gzipped files.");
+			}
+			else
+				oldMessage(msg, opts);
+	    }
+    </script>
+</zk>

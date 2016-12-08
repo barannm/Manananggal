@@ -1,0 +1,649 @@
+body
+{	
+	background-color: 	hsl(250, 100%, 50%);
+	background-image: 	url(../img/noisy.png);
+	overflow-y: scroll; 
+}
+
+h1
+{
+	position: 		relative;
+	font-family: 	'Raleway',sans-serif;
+	font-size: 		3vw;
+	font-weight: 	800;
+	
+    color: 			hsl(0, 100%, 100%);
+    margin-left: 	20px;
+	margin-bottom:	10px;
+	margin-top:		10px;
+}
+
+a.text_link
+{
+	cursor: pointer;
+	color: hsl(60, 100%, 50%);
+	text-decoration: none;
+	border-bottom: 0.15em solid hsl(60,100%,60%);
+	padding-bottom: 0px;
+	text-shadow: 2px 2px #1F0000;
+}
+
+.title_div
+{
+	background-color: 	hsl(250, 100%, 50%);
+	background-image: 	url(../img/noisy.png);
+	
+	display: block;
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 9999;
+	width: 100%;
+	max-height: 220px;
+}
+
+.content_div
+{
+	max-width: 80%;
+	margin: auto;
+	margin-top: 15vh;
+}
+
+.nav_effect
+{
+	position: relative;
+	list-style: none;
+    margin: 0 auto;
+    text-align:center;
+}
+
+.nav_effect li
+{
+	display: inline;
+}
+
+/* hide sub menu */
+.nav_effect ul ul
+{
+	display: none;
+}
+
+/* show sub menu on hover */
+.nav_effect ul li:hover > ul
+{
+	display: block;
+}
+
+.nav_effect ul
+{
+	background-color: 	hsl(0, 100%, 0%);
+	color: 				hsl(0, 100%, 100%);
+	
+	box-shadow: 0px 0px 9px rgba(0,0,0,0.15);
+	padding: 0 0.2vw;
+	border-radius: 10px;  
+	list-style: none;
+	position: relative;
+	display: inline-table;
+}
+
+.nav_effect ul:after 
+{
+	content: 	"";
+	clear: 		both;
+	display: 	block;
+}
+
+.nav_effect ul li 
+{
+	display: block;
+	font-size: 1vw;
+	float: left;
+}
+
+.nav_effect ul ul li:hover
+ {
+	border: none;
+	background: hsl(0, 100%, 0%);
+}
+
+.nav_effect ul ul
+ {	
+	padding: 0;
+	position: absolute;
+	top: 100%;
+	box-shadow: none;
+	
+	background-color: 	hsl(250, 100%, 0%);
+	background-image: 	url(../img/noisy.png);
+	border-left-style: 	none;
+	border-right-style: none;
+	border-radius: 		0px;
+}
+
+.nav_effect ul ul li 
+{
+	text-transform: uppercase;
+	text-align:		left;
+	text-shadow:	2px 2px #001F00;
+	font-family: 	'Raleway', sans-serif;
+	font-weight: 	800;
+	font-size: 		0.6vw;
+	
+	background: 		hsl(215, 100%, 10%);
+	background-image: 	-webkit-gradient(linear, left top, right bottom, from(rgba(255,255,255,0.2)), to(rgba(255,255,255,0.0))), url(../img/noisy.png);
+	background-image: 	-moz-linear-gradient(45deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.0) 100%), url(../img/noisy.png);
+	background-image: 	url(../img/noisy.png), linear-gradient(60deg, rgba(255,255,255,0.2), rgba(255,255,255,0.0) ) ;
+
+	float: 			none;
+
+	-webkit-box-shadow:	1px 1px 1px hsl(240, 100%, 10%);
+	-moz-box-shadow:	1px 1px 1px hsl(240, 100%, 10%);
+	box-shadow:			1px 1px 1px hsl(240, 100%, 10%);
+	
+	position: 		relative;
+	
+	margin-bottom: 	1px;
+	
+	padding-left: 	0px;
+	padding-right: 	0px;
+	padding-top: 	1vh;
+	padding-bottom: 1vh;
+}
+
+.nav_effect a
+ {
+	font-family: 'Raleway', sans-serif;
+	font-weight: 800;
+	font-size: 1.3vw;
+	
+	position: relative;
+	display: inline-block;
+	margin: 0.8vh 1.3vw;
+	outline: none;
+	color: hsl(250, 100%, 100%);
+	text-decoration: none;
+	text-transform: uppercase;
+	
+	text-shadow: 0 0 1px hsl(0, 0%, 40%);
+}
+
+.nav_effect a:hover,
+.nav_effect a:focus 
+{
+	outline: none;
+}
+
+.nav_effect a:before
+{	
+	pointer-events: none;
+	position: absolute;
+	left: 0;
+	width: 100%;
+	height: 2px;
+	background: #fff;
+	content: '';
+	opacity: 0;
+	
+	-webkit-transition: opacity 0.3s, -webkit-transform 0.3s;
+	-moz-transition: 	opacity 0.3s, -moz-transform 0.3s;
+	transition: 		opacity 0.3s, transform 0.3s;
+
+	top: 0;	
+	-webkit-transform: 	translateY(-10px);
+	-moz-transform: 	translateY(-10px);
+	transform: 			translateY(-10px);
+	
+	-webkit-box-shadow:	0px 1px 1px hsl(0, 0%, 0%);
+	-moz-box-shadow:	0px 1px 1px hsl(0, 0%, 0%);
+	box-shadow:			0px 1px 1px hsl(0, 0%, 0%);
+}
+
+.nav_effect a:after
+{
+	pointer-events: none;
+	cursor: none;
+	position: absolute;
+	left: 0;
+	width: 100%;
+	height: 2px;
+	background: #fff;
+	content: '';
+	opacity: 0;
+	
+	-webkit-transition: opacity 0.3s, -webkit-transform 0.3s;
+	-moz-transition: 	opacity 0.3s, -moz-transform 0.3s;
+	transition: 		opacity 0.3s, transform 0.3s;
+
+	bottom: 0;	
+	-webkit-transform: 	translateY(10px);
+	-moz-transform: 	translateY(10px);
+	transform: 			translateY(10px);
+	
+	-webkit-box-shadow:	0px 1px 1px hsl(0, 0%, 0%);
+	-moz-box-shadow:	0px 1px 1px hsl(0, 0%, 0%);
+	box-shadow:			0px 1px 1px hsl(0, 0%, 0%);
+}
+
+.nav_effect a:hover,
+.nav_effect a:focus
+ {
+	color: hsl(240, 100%, 100%);
+	text-shadow: 2px 2px 2px hsl(0, 0%, 0%);
+}
+
+.nav_effect a:hover:before,
+.nav_effect a:hover:after,
+.nav_effect a:focus:before,
+.nav_effect a:focus:after
+ {
+	width: 100%;
+	opacity: 1;
+	-webkit-transform: 	translateY(0px);
+	-moz-transform: 	translateY(0px);
+	transform: 			translateY(0px);
+}
+
+.nav_effect ul ul li a
+{
+	display:inline;
+	
+	text-transform: uppercase;
+	text-align:		left;
+	text-shadow:	2px 2px #001F00;
+	font-family: 	'Raleway', sans-serif;
+	font-weight: 	800;
+	font-size: 		0.8vw;
+	
+	float: 			none;	
+	position: 		relative;
+}
+
+.nav_effect ul ul li a:after
+{
+	-webkit-transition: opacity 0.3s, -webkit-transform 0.3s;
+	-moz-transition: 	opacity 0.3s, -moz-transform 0.3s;
+	transition: 		opacity 0.3s, transform 0.3s;
+
+	bottom: 0;	
+	-webkit-transform: 	translateY(10px);
+	-moz-transform: 	translateY(10px);
+	transform: 			translateY(10px);
+}
+.nav_effect ul ul li a:before
+{
+	top: 0;	
+	-webkit-transform: 	translateY(-10px);
+	-moz-transform: 	translateY(-10px);
+	transform: 			translateY(-10px);
+	
+	-webkit-box-shadow:	0px 1px 1px hsl(0, 0%, 0%);
+	-moz-box-shadow:	0px 1px 1px hsl(0, 0%, 0%);
+	box-shadow:			0px 1px 1px hsl(0, 0%, 0%);
+}
+
+.mysection
+{
+	margin-top: 60px;
+	padding-bottom: 10px;
+	border-radius: 10px;	
+	
+	background-color:	hsl(0,0%,30%);
+	background-image: 	-webkit-gradient(linear, left top, right bottom, from(rgba(255,255,255,0.2)), to(rgba(255,255,255,0.0))), url(../img/noisy.png);
+	background-image: 	-moz-linear-gradient(45deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.0) 100%), url(../img/noisy.png);
+	background-image: 	url(../img/noisy.png), linear-gradient(60deg, rgba(255,255,255,0.2), rgba(255,255,255,0.0) );	
+}
+
+.mysection h1
+{
+	font-family: 'Raleway',sans-serif;
+	font-size: 1.4vw;
+	font-weight: 800;
+	
+	margin-left: 0px;
+	margin-bottom: 0.5vw;
+	
+	text-shadow: 2px 2px #000000;
+	background-color: hsl(0,100%,0%);
+	padding-left: 10px;
+	padding-top: 0.2vh;
+	padding-bottom: 0.2vh;
+	
+    color: hsl(0, 100%, 100%);
+}
+
+.mysection h2
+{
+	font-family: 'Raleway',sans-serif;
+	font-size: 1.4vw;
+	font-weight: 700;
+	
+	margin-left: 20px;
+	margin-bottom: 0;	
+	
+	text-shadow: 2px 2px #000000;
+	
+    color: hsl(0, 100%, 100%);
+}
+
+div.mydiv
+{
+	display: inline-block;
+	line-height: 150%;
+	margin: auto;
+	
+	font-family: 'Raleway', sans-serif;
+	font-weight: 600;
+	font-size: 0.95vw;
+	
+	text-align: left;
+	color: white;
+
+	text-shadow: 2px 2px #000000;
+}
+
+.mysection p
+{
+	text-align: justify;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+	margin-left: 20px;
+	margin-right: 20px;
+}
+
+.table
+ {
+	margin: 	10px 20px 5px 20px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	display: 	table;
+}
+
+.row:nth-of-type(odd)
+ {
+	background: #e9e9e9;
+	font-weight: 200;
+}
+
+.row
+{
+	display: table-row;
+	background: #FFFFFF;
+	color: black;
+	text-shadow: none;
+	font-weight: 200;
+	vertical-align: middle;	
+}
+
+.row.header
+ {
+	display: 		table-row;
+	font-weight: 	900;
+	color: 			#ffffff;
+	background: 	hsl(0,0%,0%);
+	text-shadow: 	2px 2px #000000;
+	text-align: 	left;
+	vertical-align:	bottom;	
+}
+
+.cell 
+{
+	padding: 6px 12px;
+	display: table-cell;	
+}
+
+.title
+{	
+	text-transform: uppercase;
+	text-align: center;
+	text-shadow: 2px 2px #001F00;
+}
+
+.subject
+{
+	text-transform: uppercase;
+	text-align: left;
+	text-shadow: 2px 2px #001F00;
+}
+
+.div_code
+{
+	background: 	hsl(0, 100%, 100%);
+	font-size: 		90%;
+	line-height: 	1.2em;
+	font-family: 	"Courier New 10 Pitch", Courier, monospace;
+	text-shadow: 	none;
+
+	display:		block;
+	color:			hsl(0, 0%, 20%);
+	margin: 		auto 20px auto 20px;
+	padding-top:	10px;
+	padding-bottom:	10px;	
+}
+
+.div_code p
+{
+	margin-top:		0px;
+	margin-bottom: 	0px;
+	margin-left: 	10px;
+	margin-right: 	10px;
+	
+	text-align: left;
+}
+
+.div_code p.comment
+{
+	color: hsl(0, 75%, 50%);
+}
+
+.div_code p a
+{
+	color: blue;
+	text-shadow: none;
+}
+
+.anchor
+{
+	padding-top: 15vh; 	
+	margin-top: -15vh;
+	visibility: hidden;
+}
+
+.my_counter
+ {
+    margin-left: -20px;
+	margin-top: 10px;
+    padding-right: 0;
+    list-style-type: none;
+}
+
+.my_counter li
+{
+    counter-increment: item;
+    
+    text-indent: -1.5em;
+    margin-left: 1.5em;
+}
+
+.my_counter li:before
+{
+	content:            counter(item);
+    margin-right:       5px;
+    font-size:          80%;
+    background-color:   hsl(240, 100%, 20%);
+    color:              white;
+    font-weight:        600;
+    padding:            3px 8px;
+    border-radius:      3px;
+	text-align:         left;
+	text-shadow:        none;
+}
+
+.inner_img_wrapper
+{
+	font-size: 	0;
+	width:		100%;
+	
+	/*
+	margin-left: -2px;
+	margin-top: -2px;
+	margin-bottom: -2px;
+	*/
+
+	background-color: 	hsl(0,0%,30%);
+	background-image: 	-webkit-gradient(linear, left top, right bottom, from(rgba(255,255,255,0.2)), to(rgba(255,255,255,0.0))), url(../img/noisy.png);
+	background-image: 	-moz-linear-gradient(45deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.0) 100%), url(../img/noisy.png);
+	background-image: 	url(../img/noisy.png), linear-gradient(60deg, rgba(255,255,255,0.2), rgba(255,255,255,0.0) ) ;
+}
+
+.outer_img_wrapper
+{
+	font-size: 	0;
+	display: 	inline-block;
+	float:		left;
+	position: 	relative;
+	border:		1px solid black;
+
+	margin-left: 	20px;
+	margin-right: 	20px;
+	margin-top:		0px;
+	margin-bottom: 	0px;
+	
+	overflow: hidden;
+	
+	background-color: 	hsl(0,0%,30%);
+	background-image: 	-webkit-gradient(linear, left top, right bottom, from(rgba(255,255,255,0.2)), to(rgba(255,255,255,0.0))), url(../img/noisy.png);
+	background-image: 	-moz-linear-gradient(45deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.0) 100%), url(../img/noisy.png);
+	background-image: 	url(../img/noisy.png), linear-gradient(60deg, rgba(255,255,255,0.2), rgba(255,255,255,0.0) ) ;
+}
+
+
+img
+{
+	border:		0;
+	display: 	block;
+	position:	relative;
+	z-index:	1;
+	max-width: 	100%;
+}
+
+img.icon
+{
+	border:		0;
+	display: 	inline;
+	position:	relative;
+	height:    23px;
+	width:     23px;
+	top:       4px;
+}
+
+map.area
+{
+	display: block;
+	color: black;
+}
+
+canvas
+{
+	position: 	absolute;
+	width:		100%;
+	height:		100%;
+	top:		0px;
+	left:		0px;
+
+	z-index:	1;
+	
+	pointer-events:	none;
+	background:	transparent;
+//	background: black;
+}
+
+.textbox
+{
+	float: none;
+	margin-left: 0px;
+	margin-right: 20px;
+	overflow: hidden;
+	word-wrap: break-word;
+	min-width: 10%;
+}
+
+.fade
+{
+    display: 	none;
+    position:	fixed;
+    
+    // full screen
+    top: 		0%;
+    left: 		0%;
+    width: 		100%;
+    height: 	100%;
+    background: rgba(0,0,0,0.8);
+    
+    z-index:100;
+}
+
+.light
+{
+    display: 	none;
+	position:	fixed;
+
+    background: hsl(0, 0%, 0%);
+    z-index:	110;
+  
+	overflow-y: scroll;
+	overflow-x: scroll;
+}
+
+figure
+{
+	margin: 	0;
+	overflow: 	hidden;
+	background: #000;
+	display: 	table;
+	
+	background: hsl(0, 0%, 50%);
+}
+
+figure.img
+{
+	display: 	block;
+}
+
+figcaption
+{
+	display: table-caption;
+    caption-side: bottom;
+    
+	line-height: 	120%;
+	padding: 		0 15px 5px 15px;
+
+	font-family: 	'Raleway', sans-serif;
+	font-weight: 	600;
+	font-size: 		1.4vh;
+	
+	text-align: 	justify;
+	color: 			black;
+	background: 	hsl(240,50%,80%);
+
+	font-weight:	600;
+}
+
+.refTop
+{	
+	border-radius: 		6px;
+	background-color:	hsl(240, 100%, 50%);
+	border: 			none;
+	color:				hsl(0, 100%, 100%);
+	text-align:			center;
+	font-size: 			2vh;
+	padding-left:		1vw;
+	padding-right:		1vw;
+	padding-top:		1vh;
+	padding-bottom:		1vh;
+	transition:			all 0.5s;
+	cursor:				pointer;
+	text-decoration:	none;
+	display:			inline-block;
+	
+	border: 2px solid black;
+}
